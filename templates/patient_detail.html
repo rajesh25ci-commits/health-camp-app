@@ -1,0 +1,293 @@
+{% extends "base.html" %}
+
+{% block title %}{{ patient.name }} ({{ patient.patient_uid }}) - Patient Profile{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-12 col-xl-11">
+
+        <!-- Top Header Navigation & Action Bar -->
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
+            <div class="d-flex align-items-center gap-3">
+                {% if current_user.is_authenticated %}
+                <a href="{{ url_for('patients') }}" class="btn btn-outline-secondary btn-sm rounded-circle d-flex align-items-center justify-content-center shadow-sm" style="width: 38px; height: 38px;" title="Back to Patient Directory">
+                    <i class="fa-solid fa-arrow-left"></i>
+                </a>
+                {% else %}
+                <a href="{{ url_for('login') }}" class="btn btn-outline-secondary btn-sm rounded-circle d-flex align-items-center justify-content-center shadow-sm" style="width: 38px; height: 38px;" title="Sign In">
+                    <i class="fa-solid fa-arrow-left"></i>
+                </a>
+                {% endif %}
+                <div>
+                    <h3 class="fw-bold mb-0 text-dark d-flex align-items-center gap-2">
+                        <span>{{ patient.name }}</span>
+                        <span class="badge bg-success-subtle text-success border border-success-subtle fs-6 py-1 px-3 rounded-pill fw-medium">
+                            <i class="fa-solid fa-circle-check me-1"></i>Verified Beneficiary
+                        </span>
+                    </h3>
+                    <div class="d-flex align-items-center gap-2 mt-1">
+                        <span class="badge bg-primary font-monospace">{{ patient.patient_uid }}</span>
+                        <span class="text-muted small">&bull; Registered: {{ patient.created_at.strftime('%d %B %Y, %H:%M') }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action Buttons for Authenticated Staff -->
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+                <a href="{{ url_for('patient_card', patient_id=patient.patient_uid) }}" class="btn btn-warning px-3 py-2 rounded-pill shadow-sm fw-semibold text-dark">
+                    <i class="fas fa-id-card me-1"></i>Digital ID Card
+                </a>
+                {% if current_user.is_authenticated %}
+                <a href="{{ url_for('patient_pdf', patient_id=patient.patient_uid) }}" class="btn btn-danger px-4 py-2 rounded-pill shadow-sm">
+                    <i class="fa-solid fa-file-pdf me-2"></i>Download Official PDF Medical Card
+                </a>
+                <a href="{{ url_for('records') }}?patient_id={{ patient.id }}" class="btn btn-outline-primary px-3 py-2 rounded-pill shadow-sm">
+                    <i class="fa-solid fa-stethoscope me-1"></i>New Encounter
+                </a>
+                {% else %}
+                <a href="{{ url_for('login') }}?next={{ url_for('patient_detail', patient_id=patient.patient_uid) }}" class="btn btn-primary px-4 py-2 rounded-pill shadow-sm">
+                    <i class="fa-solid fa-right-to-bracket me-2"></i>Medical Staff Sign In
+                </a>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Demographic Profile Card with Photo & QR Code Side-by-Side -->
+        <div class="card border-0 shadow-sm rounded-4 mb-4 bg-white overflow-hidden">
+            <div class="card-header bg-primary text-white py-3 px-4 d-flex justify-content-between align-items-center">
+                <span class="fw-bold"><i class="fa-solid fa-id-card-clip me-2"></i>Official Digital Health Pass & Demographics Profile</span>
+                <span class="badge bg-white text-primary fw-semibold">Active Enrollment</span>
+            </div>
+            <div class="card-body p-4">
+                <div class="row g-4 align-items-center">
+
+                    <!-- Side-by-Side Identification: Photo & Scannable QR Pass -->
+                    <div class="col-12 col-lg-5 border-end-lg">
+                        <div class="p-3 bg-light rounded-4 text-center border">
+                            <span class="small fw-semibold text-muted text-uppercase d-block mb-3 letter-spacing">
+                                Biometric & QR Verification
+                            </span>
+                            <div class="d-flex justify-content-center align-items-center gap-4">
+                                <!-- Photo -->
+                                <div class="text-center">
+                                    {% if patient.photo_filename %}
+                                        <img src="{{ url_for('static', filename='uploads/' + patient.photo_filename) }}" class="rounded shadow-sm" style="width: 120px; height: 120px; object-fit: cover;">
+                                    {% else %}
+                                        <!-- Default Stylized Healthcare Avatar Placeholder -->
+                                        <div class="rounded shadow-sm bg-white border border-2 border-primary-subtle d-flex flex-column align-items-center justify-content-center text-primary" style="width: 120px; height: 120px;">
+                                            <i class="fa-solid fa-hospital-user fs-1 text-primary"></i>
+                                            <span class="badge bg-light text-secondary mt-1" style="font-size: 0.65rem;">No Photo</span>
+                                        </div>
+                                    {% endif %}
+                                    {% if current_user.is_authenticated %}
+                                    <div class="mt-2">
+                                        <button type="button" class="btn btn-outline-primary btn-sm rounded-pill px-2 py-0" style="font-size: 0.72rem;" data-bs-toggle="modal" data-bs-target="#updatePhotoModal">
+                                            <i class="fa-solid fa-camera me-1"></i>{% if patient.photo_filename %}Change Photo{% else %}Upload Photo{% endif %}
+                                        </button>
+                                    </div>
+                                    {% else %}
+                                    <div class="mt-2">
+                                        <span class="badge bg-secondary-subtle text-secondary" style="font-size: 0.65rem;">Beneficiary Photo</span>
+                                    </div>
+                                    {% endif %}
+                                </div>
+
+                                <!-- Dynamic Scannable QR Code -->
+                                <div class="text-center">
+                                    <a href="{{ url_for('static', filename=patient.qr_code_path) if patient.qr_code_path else url_for('static', filename='qrcodes/default_qr.png') }}" target="_blank" title="View / Print Full QR Code">
+                                        <img src="{{ url_for('static', filename=patient.qr_code_path) if patient.qr_code_path else url_for('static', filename='qrcodes/default_qr.png') }}" class="img-fluid rounded border p-2 shadow-sm bg-white" style="width: 120px; height: 120px; object-fit: contain;" alt="QR Code">
+                                    </a>
+                                    <div class="mt-2">
+                                        <span class="badge bg-info-subtle text-info border border-info-subtle" style="font-size: 0.72rem;">Scan QR Pass</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Permanent Patient ID and Scannable Profile URL -->
+                            <div class="mt-3">
+                                <code class="fw-bold text-dark fs-6">{{ patient.patient_uid }}</code>
+                                {% if profile_url %}
+                                <div class="mt-1">
+                                    <small class="text-muted text-break d-block" style="font-size: 0.7rem;">
+                                        <i class="fa-solid fa-link me-1"></i>{{ profile_url }}
+                                    </small>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Demographic Fields Grid -->
+                    <div class="col-12 col-lg-7">
+                        <div class="row g-3">
+                            <div class="col-6 col-md-4">
+                                <label class="text-muted small fw-medium d-block">Full Legal Name</label>
+                                <span class="fs-6 fw-bold text-dark">{{ patient.name }}</span>
+                            </div>
+                            <div class="col-6 col-md-4">
+                                <label class="text-muted small fw-medium d-block">Gender</label>
+                                <span class="fs-6 fw-bold text-dark">{{ patient.gender }}</span>
+                            </div>
+                            <div class="col-6 col-md-4">
+                                <label class="text-muted small fw-medium d-block">Age</label>
+                                <span class="fs-6 fw-bold text-dark">{{ patient.age }} Years</span>
+                            </div>
+                            <div class="col-6 col-md-6">
+                                <label class="text-muted small fw-medium d-block">Contact Phone</label>
+                                <span class="fs-6 fw-bold text-dark">
+                                    <i class="fa-solid fa-phone text-primary me-1"></i>{{ patient.phone or 'Not Provided' }}
+                                </span>
+                            </div>
+                            <div class="col-6 col-md-6">
+                                <label class="text-muted small fw-medium d-block">Registration Date</label>
+                                <span class="fs-6 fw-bold text-dark">
+                                    <i class="fa-regular fa-calendar-check text-success me-1"></i>{{ patient.created_at.strftime('%d %B %Y') }}
+                                </span>
+                            </div>
+                            <div class="col-12">
+                                <label class="text-muted small fw-medium d-block">Residential Address / Ward / Locality</label>
+                                <span class="fs-6 text-dark bg-light p-2 rounded-2 d-block border">
+                                    <i class="fa-solid fa-location-dot text-danger me-1"></i>{{ patient.address or 'No residential address recorded.' }}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+        <!-- Clinical Encounter & Prescription History (Restricted to Authorized Users) -->
+        {% if current_user.is_authenticated %}
+        <div class="card border-0 shadow-sm rounded-4 bg-white mb-4">
+            <div class="card-header bg-white py-3 px-4 border-bottom d-flex justify-content-between align-items-center">
+                <div>
+                    <h5 class="fw-bold mb-0 text-dark">
+                        <i class="fa-solid fa-notes-medical text-primary me-2"></i>Clinical Encounter & Prescription History
+                    </h5>
+                    <small class="text-muted">Chronological consultations recorded during health camp operations</small>
+                </div>
+                <span class="badge bg-secondary-subtle text-secondary px-3 py-2 rounded-pill">
+                    {{ patient.health_records|length }} Total Visits
+                </span>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr class="small text-muted text-uppercase">
+                                <th class="ps-4">Encounter Date</th>
+                                <th>Attending Doctor</th>
+                                <th>Camp Location</th>
+                                <th>Clinical Diagnosis</th>
+                                <th>Prescription & Dosage</th>
+                                <th class="pe-4">Doctor Notes</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% if patient.health_records %}
+                                {% for rec in patient.health_records|sort(attribute='created_at', reverse=True) %}
+                                <tr>
+                                    <td class="ps-4">
+                                        <div class="fw-bold text-dark">{{ rec.created_at.strftime('%d %b %Y') }}</div>
+                                        <small class="text-muted">{{ rec.created_at.strftime('%H:%M') }}</small>
+                                    </td>
+                                    <td>
+                                        {% if rec.doctor %}
+                                            <div class="fw-semibold text-dark">{{ rec.doctor.name }}</div>
+                                            <small class="text-muted">{{ rec.doctor.specialization }}</small>
+                                        {% else %}
+                                            <span class="text-muted">Medical Officer</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if rec.camp %}
+                                            <div class="small fw-semibold text-dark">{{ rec.camp.title }}</div>
+                                            <small class="text-muted">{{ rec.camp.location_name }}</small>
+                                        {% else %}
+                                            <span class="text-muted small">General Camp</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-danger-subtle text-danger border border-danger-subtle px-2 py-1">
+                                            {{ rec.diagnosis }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <div class="small text-dark font-monospace bg-light p-2 rounded border" style="white-space: pre-line;">
+                                            {{ rec.prescription or 'None specified' }}
+                                        </div>
+                                    </td>
+                                    <td class="pe-4">
+                                        <span class="text-muted small" style="white-space: pre-line;">
+                                            {{ rec.doctor_notes or '—' }}
+                                        </span>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            {% else %}
+                                <tr>
+                                    <td colspan="6" class="text-center py-5 text-muted">
+                                        <i class="fa-solid fa-clipboard-question fs-1 d-block mb-3 text-secondary"></i>
+                                        No clinical consultation records found for this patient yet.
+                                    </td>
+                                </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <!-- Confidential Clinical Records Privacy Banner (Shown to Unauthenticated Scanners) -->
+        <div class="card border-0 shadow-sm rounded-4 bg-white mb-4 p-4 text-center">
+            <div class="d-inline-flex p-3 rounded-circle bg-warning bg-opacity-10 text-warning mx-auto mb-3" style="width: 60px; height: 60px; align-items: center; justify-content: center;">
+                <i class="fa-solid fa-shield-halved fs-3"></i>
+            </div>
+            <h5 class="fw-bold text-dark mb-1">Confidential Medical Records & Prescriptions Protected</h5>
+            <p class="text-muted small mx-auto mb-3" style="max-width: 550px;">
+                In compliance with medical data privacy regulations, detailed consultation notes, clinical diagnoses, and prescriptions are restricted to authenticated medical staff and camp officers.
+            </p>
+            <div>
+                <a href="{{ url_for('login') }}?next={{ url_for('patient_detail', patient_id=patient.patient_uid) }}" class="btn btn-primary px-4 rounded-pill shadow-sm">
+                    <i class="fa-solid fa-user-doctor me-1"></i> Medical Staff Sign In to View Complete Records
+                </a>
+            </div>
+        </div>
+        {% endif %}
+
+    </div>
+</div>
+
+{% if current_user.is_authenticated %}
+<!-- Modal: Upload / Update Photo -->
+<div class="modal fade" id="updatePhotoModal" tabindex="-1" aria-labelledby="updatePhotoModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <form method="POST" action="{{ url_for('patient_update_photo', patient_id=patient.patient_uid) }}" enctype="multipart/form-data">
+                <div class="modal-header bg-primary text-white">
+                    <h6 class="modal-title fw-bold" id="updatePhotoModalLabel">
+                        <i class="fa-solid fa-camera me-2"></i>Upload / Update Beneficiary Photo
+                    </h6>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <p class="text-muted small mb-3">Upload an identification portrait for <b>{{ patient.name }}</b> (<code>{{ patient.patient_uid }}</code>).</p>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Select Photo File</label>
+                        <input type="file" name="photo" class="form-control" accept="image/*" required>
+                        <small class="text-muted" style="font-size: 0.75rem;">Supported formats: PNG, JPG, JPEG, WEBP (Max 16MB)</small>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary btn-sm px-3">
+                        <i class="fa-solid fa-cloud-arrow-up me-1"></i> Upload Photo
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

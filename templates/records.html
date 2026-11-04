@@ -1,0 +1,184 @@
+{% extends "base.html" %}
+
+{% block title %}Clinical Health Records & Prescriptions{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-12 col-xl-11">
+
+        <!-- Page Header & Action -->
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
+            <div>
+                <h3 class="fw-bold mb-1 text-dark">
+                    <i class="fa-solid fa-notes-medical text-primary me-2"></i>Clinical Health Records & Prescriptions
+                </h3>
+                <p class="text-muted mb-0 small">Consultation notes, diagnoses, medications issued, and official clinical summaries.</p>
+            </div>
+            <div>
+                <button type="button" class="btn btn-primary px-4 py-2 rounded-pill shadow-sm" data-bs-toggle="modal" data-bs-target="#newRecordModal">
+                    <i class="fa-solid fa-plus me-2"></i>Record Clinical Encounter
+                </button>
+            </div>
+        </div>
+
+        <!-- Records Table -->
+        <div class="card border-0 shadow-sm rounded-4 bg-white">
+            <div class="card-header bg-white py-3 px-4 border-bottom d-flex justify-content-between align-items-center">
+                <span class="fw-bold text-dark">
+                    Recorded Consultations ({{ records|length }})
+                </span>
+                <span class="text-muted small">Official clinical encounters</span>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr class="small text-muted text-uppercase">
+                                <th class="ps-4">Encounter Date</th>
+                                <th>Patient Beneficiary</th>
+                                <th>Attending Doctor</th>
+                                <th>Camp Location</th>
+                                <th>Clinical Diagnosis</th>
+                                <th>Prescription & Notes</th>
+                                <th class="text-end pe-4">Medical PDF</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% if records %}
+                                {% for r in records %}
+                                <tr>
+                                    <td class="ps-4">
+                                        <div class="fw-bold text-dark">{{ r.created_at.strftime('%d %b %Y') }}</div>
+                                        <small class="text-muted">{{ r.created_at.strftime('%H:%M') }}</small>
+                                    </td>
+                                    <td>
+                                        {% if r.patient %}
+                                            <a href="{{ url_for('patient_detail', id=r.patient.id) }}" class="fw-bold text-primary text-decoration-none d-block">
+                                                {{ r.patient.name }}
+                                            </a>
+                                            <span class="badge bg-secondary-subtle text-secondary font-monospace">{{ r.patient.patient_uid }}</span>
+                                        {% else %}
+                                            <span class="text-muted">Unlinked Patient</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if r.doctor %}
+                                            <div class="fw-semibold text-dark">{{ r.doctor.name }}</div>
+                                            <small class="text-muted">{{ r.doctor.specialization }}</small>
+                                        {% else %}
+                                            <span class="text-muted">Medical Officer</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if r.camp %}
+                                            <div class="small fw-semibold text-dark">{{ r.camp.title }}</div>
+                                            <small class="text-muted">{{ r.camp.location_name }}</small>
+                                        {% else %}
+                                            <span class="text-muted small">General Outreach</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-danger-subtle text-danger border border-danger-subtle px-2 py-1">
+                                            {{ r.diagnosis }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <div class="small font-monospace text-dark bg-light p-2 rounded border mb-1" style="max-width: 250px; white-space: pre-line;">
+                                            {{ r.prescription or 'None' }}
+                                        </div>
+                                        {% if r.doctor_notes %}
+                                            <small class="text-muted d-block"><i>Note: {{ r.doctor_notes }}</i></small>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-end pe-4">
+                                        {% if r.patient %}
+                                            <a href="{{ url_for('patient_pdf', id=r.patient.id) }}" class="btn btn-sm btn-outline-danger rounded-pill px-3" title="Download Official Medical Card">
+                                                <i class="fa-solid fa-file-pdf me-1"></i> PDF Card
+                                            </a>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            {% else %}
+                                <tr>
+                                    <td colspan="7" class="text-center py-5 text-muted">
+                                        No clinical consultation records found.
+                                    </td>
+                                </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<!-- Modal: Record Clinical Encounter -->
+<div class="modal fade" id="newRecordModal" tabindex="-1" aria-labelledby="newRecordModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow">
+            <form method="POST" action="{{ url_for('record_add') }}">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title fw-bold" id="newRecordModalLabel">
+                        <i class="fa-solid fa-notes-medical me-2"></i>Record Clinical Consultation & Prescription
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="row g-3">
+                        <div class="col-12 col-md-6">
+                            <label class="form-label fw-semibold">Select Beneficiary Patient <span class="text-danger">*</span></label>
+                            <select class="form-select" name="patient_id" required>
+                                <option value="">-- Choose Patient --</option>
+                                {% for p in patients %}
+                                <option value="{{ p.id }}" {% if selected_patient_id == p.id %}selected{% endif %}>
+                                    {{ p.name }} ({{ p.patient_uid }})
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label fw-semibold">Attending Doctor <span class="text-danger">*</span></label>
+                            <select class="form-select" name="doctor_id" required>
+                                <option value="">-- Choose Doctor --</option>
+                                {% for d in doctors %}
+                                <option value="{{ d.id }}">{{ d.name }} ({{ d.specialization }})</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">Health Camp Venue <span class="text-danger">*</span></label>
+                            <select class="form-select" name="camp_id" required>
+                                <option value="">-- Choose Camp --</option>
+                                {% for c in camps %}
+                                <option value="{{ c.id }}">{{ c.title }} - {{ c.location_name }} ({{ c.date.strftime('%d %b %Y') }})</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">Primary Diagnosis <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" name="diagnosis" placeholder="e.g. Acute Upper Respiratory Tract Infection / Hypertension Grade 1" required>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">Prescription & Medication Dosage</label>
+                            <textarea class="form-control font-monospace" name="prescription" rows="3" placeholder="e.g. Paracetamol 500mg - 1 tab TDS after food x 3 days&#10;Amoxicillin 250mg - 1 cap BD x 5 days"></textarea>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">Doctor Clinical Notes / Advice</label>
+                            <textarea class="form-control" name="doctor_notes" rows="2" placeholder="e.g. Adequate hydration recommended. Follow-up at next camp if symptoms persist."></textarea>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary px-3" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary px-4">
+                        <i class="fa-solid fa-check me-1"></i> Save Clinical Record
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,244 @@
+{% extends "base.html" %}
+
+{% block title %}Pharmacy Inventory & Medication Stock{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-12 col-xl-11">
+
+        <!-- Page Header & Action -->
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
+            <div>
+                <h3 class="fw-bold mb-1 text-dark">
+                    <i class="fa-solid fa-pills text-primary me-2"></i>Pharmacy Inventory & Medication Stock
+                </h3>
+                <p class="text-muted mb-0 small">Pharmaceutical inventory tracking, batch monitoring, expiration alerts, and reorder levels.</p>
+            </div>
+            <div>
+                <button type="button" class="btn btn-primary px-4 py-2 rounded-pill shadow-sm" data-bs-toggle="modal" data-bs-target="#addMedicineModal">
+                    <i class="fa-solid fa-plus me-2"></i>Add Medicine Batch
+                </button>
+            </div>
+        </div>
+
+        <!-- Inventory Metrics Banner -->
+        <div class="row g-3 mb-4">
+            <div class="col-12 col-sm-6 col-lg-3">
+                <div class="card border-0 shadow-sm rounded-3 p-3 bg-white">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <span class="text-muted small fw-semibold text-uppercase">Total Batches</span>
+                            <h3 class="fw-bold mb-0 text-dark">{{ medicines|length }}</h3>
+                        </div>
+                        <div class="metric-icon bg-primary bg-opacity-10 text-primary">
+                            <i class="fa-solid fa-boxes-stacked"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-12 col-sm-6 col-lg-3">
+                <div class="card border-0 shadow-sm rounded-3 p-3 bg-white">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <span class="text-muted small fw-semibold text-uppercase">Total Quantity</span>
+                            <h3 class="fw-bold mb-0 text-success">{{ total_quantity }}</h3>
+                        </div>
+                        <div class="metric-icon bg-success bg-opacity-10 text-success">
+                            <i class="fa-solid fa-capsules"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-12 col-sm-6 col-lg-3">
+                <div class="card border-0 shadow-sm rounded-3 p-3 bg-white">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <span class="text-muted small fw-semibold text-uppercase">Low Stock Alerts</span>
+                            <h3 class="fw-bold mb-0 text-danger">{{ low_stock_count }}</h3>
+                        </div>
+                        <div class="metric-icon bg-danger bg-opacity-10 text-danger">
+                            <i class="fa-solid fa-triangle-exclamation"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-12 col-sm-6 col-lg-3">
+                <div class="card border-0 shadow-sm rounded-3 p-3 bg-white">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <span class="text-muted small fw-semibold text-uppercase">Stock Valuation</span>
+                            <h3 class="fw-bold mb-0 text-info">₹{{ "%.2f"|format(total_valuation) }}</h3>
+                        </div>
+                        <div class="metric-icon bg-info bg-opacity-10 text-info">
+                            <i class="fa-solid fa-indian-rupee-sign"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Inventory Data Table -->
+        <div class="card border-0 shadow-sm rounded-4 bg-white">
+            <div class="card-header bg-white py-3 px-4 border-bottom d-flex justify-content-between align-items-center">
+                <span class="fw-bold text-dark">
+                    Pharmaceutical Stock Directory
+                </span>
+                <span class="text-muted small">Batch-level tracking</span>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr class="small text-muted text-uppercase">
+                                <th class="ps-4">Medicine Name</th>
+                                <th>Batch Code</th>
+                                <th>Available Stock</th>
+                                <th>Reorder Level</th>
+                                <th>Expiry Date</th>
+                                <th>Unit Price</th>
+                                <th>Status</th>
+                                <th class="text-end pe-4">Adjust Stock</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% if medicines %}
+                                {% for m in medicines %}
+                                <tr>
+                                    <td class="ps-4">
+                                        <div class="fw-bold text-dark">{{ m.name }}</div>
+                                        <small class="text-muted">Added: {{ m.created_at.strftime('%d %b %Y') }}</small>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-secondary-subtle text-secondary font-monospace px-2 py-1">
+                                            {{ m.batch_number }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span class="fs-6 fw-bold {% if m.is_low_stock %}text-danger{% else %}text-success{% endif %}">
+                                            {{ m.quantity }} units
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span class="text-muted">{{ m.reorder_level }} units</span>
+                                    </td>
+                                    <td>
+                                        <div class="small fw-semibold text-dark">{{ m.expiry_date.strftime('%d %b %Y') }}</div>
+                                        {% if m.is_expired %}
+                                            <span class="badge bg-danger">Expired</span>
+                                        {% else %}
+                                            <small class="text-muted">Valid</small>
+                                        {% endif %}
+                                    </td>
+                                    <td>₹{{ "%.2f"|format(m.unit_price) }}</td>
+                                    <td>
+                                        {% if m.is_expired %}
+                                            <span class="badge bg-danger-subtle text-danger border border-danger-subtle px-2 py-1">Expired</span>
+                                        {% elif m.is_low_stock %}
+                                            <span class="badge bg-warning-subtle text-warning border border-warning-subtle px-2 py-1">Low Stock</span>
+                                        {% else %}
+                                            <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1">Adequate</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-end pe-4">
+                                        <button type="button" class="btn btn-sm btn-outline-primary rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#updateStockModal{{ m.id }}">
+                                            <i class="fa-solid fa-pen-to-square me-1"></i> Adjust
+                                        </button>
+                                    </td>
+                                </tr>
+
+                                <!-- Modal: Update Stock for this item -->
+                                <div class="modal fade" id="updateStockModal{{ m.id }}" tabindex="-1" aria-hidden="true">
+                                    <div class="modal-dialog modal-dialog-centered">
+                                        <div class="modal-content border-0 shadow">
+                                            <form method="POST" action="{{ url_for('medicine_update_stock', id=m.id) }}">
+                                                <div class="modal-header bg-light">
+                                                    <h6 class="modal-title fw-bold">
+                                                        Adjust Stock: {{ m.name }} ({{ m.batch_number }})
+                                                    </h6>
+                                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                </div>
+                                                <div class="modal-body p-4">
+                                                    <div class="mb-3">
+                                                        <label class="form-label fw-semibold">Current Quantity in Stock</label>
+                                                        <input type="number" class="form-control" name="quantity" value="{{ m.quantity }}" min="0" required>
+                                                    </div>
+                                                    <div class="mb-3">
+                                                        <label class="form-label fw-semibold">Reorder Threshold Level</label>
+                                                        <input type="number" class="form-control" name="reorder_level" value="{{ m.reorder_level }}" min="1" required>
+                                                    </div>
+                                                </div>
+                                                <div class="modal-footer bg-light">
+                                                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                                                    <button type="submit" class="btn btn-primary btn-sm px-3">Update Stock Level</button>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            {% else %}
+                                <tr>
+                                    <td colspan="8" class="text-center py-5 text-muted">No medicines found in the pharmacy inventory.</td>
+                                </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<!-- Modal: Add New Medicine Batch -->
+<div class="modal fade" id="addMedicineModal" tabindex="-1" aria-labelledby="addMedicineModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <form method="POST" action="{{ url_for('medicine_add') }}">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title fw-bold" id="addMedicineModalLabel">
+                        <i class="fa-solid fa-capsules me-2"></i>Add Medicine Stock Batch
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Medicine / Drug Name <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" name="name" placeholder="e.g. Ibuprofen 400mg" required>
+                    </div>
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <label class="form-label fw-semibold">Batch Code <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control font-monospace" name="batch_number" placeholder="e.g. IBP-2026-D1" required>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label fw-semibold">Initial Quantity <span class="text-danger">*</span></label>
+                            <input type="number" class="form-control" name="quantity" min="0" placeholder="e.g. 500" required>
+                        </div>
+                    </div>
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <label class="form-label fw-semibold">Expiry Date <span class="text-danger">*</span></label>
+                            <input type="date" class="form-control" name="expiry_date" required>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label fw-semibold">Reorder Threshold</label>
+                            <input type="number" class="form-control" name="reorder_level" min="1" value="50" required>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Unit Price (₹)</label>
+                        <input type="number" step="0.01" class="form-control" name="unit_price" value="2.50">
+                    </div>
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary px-3" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary px-4">
+                        <i class="fa-solid fa-check me-1"></i> Save Medicine Batch
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Smart Health Camp{% endblock %} - Community Health Camp System</title>
+
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- FontAwesome 6 Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Bootstrap Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <!-- Leaflet.js CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+
+    {% block head %}{% endblock %}
+</head>
+<body class="d-flex flex-column min-vh-100 bg-light">
+
+    {% if current_user.is_authenticated %}
+    <!-- Modern Healthcare Navigation Bar (Authenticated) -->
+    <nav class="navbar navbar-expand-xl navbar-dark shadow-sm sticky-top" style="background: linear-gradient(135deg, #1e3a8a 0%, #172554 100%);">
+        <div class="container-fluid px-4">
+            <!-- Brand -->
+            <a class="navbar-brand d-flex align-items-center gap-2 py-2" href="{{ url_for('dashboard') }}">
+                <div class="d-inline-flex align-items-center justify-content-center bg-white text-danger rounded-circle" style="width: 36px; height: 36px;">
+                    <i class="fa-solid fa-heart-pulse fs-5"></i>
+                </div>
+                <div class="d-flex flex-column lh-sm">
+                    <span class="fw-bold tracking-tight text-white fs-5">Smart Health Camp</span>
+                    <span class="text-white-50" style="font-size: 0.72rem; letter-spacing: 0.5px;">COMMUNITY HEALTHCARE MANAGEMENT</span>
+                </div>
+            </a>
+
+            <!-- Mobile Toggler -->
+            <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navbarMain">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+
+            <!-- Navigation Links -->
+            <div class="collapse navbar-collapse" id="navbarMain">
+                <ul class="navbar-nav me-auto mb-2 mb-xl-0 ms-xl-3 gap-1">
+                    <li class="nav-item">
+                        <a class="nav-link px-3 py-2 rounded-2 {% if request.endpoint == 'dashboard' %}active bg-white bg-opacity-10 fw-semibold text-white{% endif %}" href="{{ url_for('dashboard') }}">
+                            <i class="fas fa-chart-pie me-2"></i>Dashboard
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link px-3 py-2 rounded-2 {% if request.endpoint in ['patients', 'patient_detail'] %}active bg-white bg-opacity-10 fw-semibold text-white{% endif %}" href="{{ url_for('patients') }}">
+                            <i class="fas fa-hospital-user me-2"></i>Patients
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link px-3 py-2 rounded-2 {% if request.endpoint == 'doctors' %}active bg-white bg-opacity-10 fw-semibold text-white{% endif %}" href="{{ url_for('doctors') }}">
+                            <i class="fas fa-user-doctor me-2"></i>Doctors
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link px-3 py-2 rounded-2 {% if request.endpoint == 'camps' %}active bg-white bg-opacity-10 fw-semibold text-white{% endif %}" href="{{ url_for('camps') }}">
+                            <i class="fas fa-map-location-dot me-2"></i>Health Camps (Map)
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link px-3 py-2 rounded-2 {% if request.endpoint == 'appointments' %}active bg-white bg-opacity-10 fw-semibold text-white{% endif %}" href="{{ url_for('appointments') }}">
+                            <i class="fas fa-calendar-check me-2"></i>Consultations
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link px-3 py-2 rounded-2 {% if request.endpoint == 'records' %}active bg-white bg-opacity-10 fw-semibold text-white{% endif %}" href="{{ url_for('records') }}">
+                            <i class="fas fa-notes-medical me-2"></i>Health Records
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link px-3 py-2 rounded-2 {% if request.endpoint == 'inventory' %}active bg-white bg-opacity-10 fw-semibold text-white{% endif %}" href="{{ url_for('inventory') }}">
+                            <i class="fas fa-pills me-2"></i>Pharmacy Inventory
+                        </a>
+                    </li>
+                </ul>
+
+                <!-- User Profile & Sign Out & Scan QR Button -->
+                <ul class="navbar-nav ms-auto align-items-center gap-2">
+                    <li class="nav-item">
+                        <button type="button" class="btn btn-warning btn-sm px-3 rounded-pill d-flex align-items-center gap-1 shadow-sm fw-semibold text-dark" data-bs-toggle="modal" data-bs-target="#qrScannerModal">
+                            <i class="fas fa-qrcode me-1"></i>
+                            <span>Scan QR Pass</span>
+                        </button>
+                    </li>
+                    <li class="nav-item d-flex align-items-center text-light me-1">
+                        <div class="d-flex align-items-center bg-white bg-opacity-10 border border-white border-opacity-20 px-3 py-1 rounded-pill">
+                            <i class="fas fa-circle-user fs-5 text-info me-2"></i>
+                            <div class="d-flex flex-column text-start lh-1">
+                                <span class="fw-semibold text-white small">{{ current_user.username }}</span>
+                                <span class="badge bg-primary-subtle text-primary border border-primary-subtle mt-1" style="font-size: 0.65rem; width: fit-content;">
+                                    {{ current_user.role }}
+                                </span>
+                            </div>
+                        </div>
+                    </li>
+                    <li class="nav-item">
+                        <a class="btn btn-outline-light btn-sm px-3 rounded-pill" href="{{ url_for('logout') }}">
+                            <i class="fas fa-right-from-bracket me-2"></i> Logout
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+    {% else %}
+    <!-- Public Minimal Navigation Bar (For Beneficiaries / QR Scanners) -->
+    <nav class="navbar navbar-dark shadow-sm sticky-top" style="background: linear-gradient(135deg, #1e3a8a 0%, #172554 100%);">
+        <div class="container-fluid px-4 d-flex justify-content-between align-items-center">
+            <a class="navbar-brand d-flex align-items-center gap-2 py-2" href="{{ url_for('login') }}">
+                <div class="d-inline-flex align-items-center justify-content-center bg-white text-danger rounded-circle" style="width: 36px; height: 36px;">
+                    <i class="fas fa-heart-pulse fs-5"></i>
+                </div>
+                <div class="d-flex flex-column lh-sm">
+                    <span class="fw-bold tracking-tight text-white fs-5">Smart Health Camp</span>
+                    <span class="text-white-50" style="font-size: 0.72rem; letter-spacing: 0.5px;">COMMUNITY HEALTHCARE MANAGEMENT</span>
+                </div>
+            </a>
+            <div class="d-flex align-items-center gap-2">
+                <button type="button" class="btn btn-warning btn-sm px-3 rounded-pill d-flex align-items-center gap-1 shadow-sm fw-semibold text-dark" data-bs-toggle="modal" data-bs-target="#qrScannerModal">
+                    <i class="fas fa-qrcode me-1"></i>
+                    <span>Scan QR</span>
+                </button>
+                <a href="{{ url_for('login') }}" class="btn btn-outline-light btn-sm px-3 rounded-pill">
+                    <i class="fas fa-right-to-bracket me-2"></i> Login
+                </a>
+            </div>
+        </div>
+    </nav>
+    {% endif %}
+
+    <!-- Flash Notifications Container -->
+    <main class="container-fluid min-vh-100 w-100 p-3 flex-grow-1" style="box-sizing: border-box; overflow-x: hidden;">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="row justify-content-center">
+                    <div class="col-12 col-xl-11">
+                        {% for category, message in messages %}
+                            <div class="alert alert-{{ category }} alert-dismissible fade show shadow-sm border-0 d-flex align-items-center gap-2" role="alert">
+                                {% if category == 'success' %}
+                                    <i class="fa-solid fa-circle-check text-success fs-5"></i>
+                                {% elif category == 'danger' %}
+                                    <i class="fa-solid fa-circle-exclamation text-danger fs-5"></i>
+                                {% elif category == 'warning' %}
+                                    <i class="fa-solid fa-triangle-exclamation text-warning fs-5"></i>
+                                {% else %}
+                                    <i class="fa-solid fa-circle-info text-info fs-5"></i>
+                                {% endif %}
+                                <div class="flex-grow-1">{{ message }}</div>
+                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Global Modal: Camera QR Health Pass Scanner -->
+    <div class="modal fade" id="qrScannerModal" tabindex="-1" aria-labelledby="qrScannerModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
+                <div class="modal-header bg-primary text-white">
+                    <h6 class="modal-title fw-bold" id="qrScannerModalLabel">
+                        <i class="fa-solid fa-qrcode me-2"></i>Patient QR Health Pass Scanner
+                    </h6>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close" id="closeScannerModalBtn"></button>
+                </div>
+                <div class="modal-body p-4 text-center">
+                    <p class="text-muted small mb-3">Align the patient's QR code within the viewfinder. The camera will automatically detect the pass and navigate to the clinical profile.</p>
+
+                    <!-- Camera Viewport Box -->
+                    <div id="qr-reader" class="rounded-3 border overflow-hidden mx-auto bg-dark mb-3" style="width: 100%; min-height: 250px;"></div>
+
+                    <div id="scannerFeedback" class="small text-muted mb-3">
+                        <i class="fa-solid fa-camera me-1"></i>Position QR Code in front of camera
+                    </div>
+
+                    <!-- Manual Patient UID Fallback Form -->
+                    <div class="card bg-light border-0 p-3 rounded-3 text-start">
+                        <label class="form-label small fw-semibold text-muted mb-1">
+                            <i class="fa-solid fa-keyboard me-1"></i>Manual UID or Scanned URL Lookup
+                        </label>
+                        <div class="input-group input-group-sm">
+                            <input type="text" id="manualPatientInput" class="form-control" placeholder="e.g. PAT-2026-0001 or URL">
+                            <button class="btn btn-primary px-3" type="button" id="manualLookupBtn">
+                                <i class="fa-solid fa-arrow-right"></i> Open Profile
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light py-2">
+                    <button type="button" class="btn btn-secondary btn-sm rounded-pill px-3" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Professional Footer -->
+    <footer class="bg-white border-top py-3 mt-auto text-muted small">
+        <div class="container-fluid px-4 d-flex flex-column flex-md-row justify-content-between align-items-center gap-2">
+            <div>
+                <span class="fw-semibold text-primary">Smart Community Health Camp Management System</span> &bull; Enterprise Architecture
+            </div>
+            <div>
+                <span class="badge bg-success-subtle text-success border border-success-subtle me-2">
+                    <i class="fa-solid fa-shield-halved me-1"></i>HIPAA & GDPR Aligned
+                </span>
+                <span>&copy; {{ 2026 }} Community Health Care Initiatives</span>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Bootstrap 5 Bundle JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Leaflet.js CDN -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <!-- HTML5 QR Code Scanner Library CDN -->
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+    <!-- App Script -->
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+
+    <!-- QR Scanner Lifecycle Script -->
+    <script>
+    let html5QrCode = null;
+
+    function handleScanSuccess(decodedText, decodedResult) {
+        console.log("QR decoded:", decodedText);
+        const feedback = document.getElementById('scannerFeedback');
+        if (feedback) {
+            feedback.innerHTML = '<span class="text-success fw-bold"><i class="fa-solid fa-circle-check me-1"></i>QR Code Recognized! Loading profile...</span>';
+        }
+
+        // Stop camera stream safely
+        stopQrScanner();
+
+        // Navigate to patient URL or UID
+        let cleanText = decodedText.trim();
+        if (cleanText.startsWith('http://') || cleanText.startsWith('https://')) {
+            window.location.href = cleanText;
+        } else if (cleanText.startsWith('/patient_card/')) {
+            window.location.href = cleanText;
+        } else if (cleanText.startsWith('/patient/')) {
+            window.location.href = cleanText;
+        } else {
+            window.location.href = `/patient_card/${encodeURIComponent(cleanText)}`;
+        }
+    }
+
+    function startQrScanner() {
+        const reader = document.getElementById('qr-reader');
+        if (!reader || typeof Html5Qrcode === 'undefined') return;
+
+        if (!html5QrCode) {
+            html5QrCode = new Html5Qrcode("qr-reader");
+        }
+
+        const config = { fps: 10, qrbox: { width: 220, height: 220 } };
+
+        html5QrCode.start(
+            { facingMode: "environment" },
+            config,
+            handleScanSuccess
+        ).catch(err => {
+            console.warn("Primary environment camera failed, trying default:", err);
+            Html5Qrcode.getCameras().then(cameras => {
+                if (cameras && cameras.length) {
+                    html5QrCode.start(cameras[0].id, config, handleScanSuccess);
+                } else {
+                    const fb = document.getElementById('scannerFeedback');
+                    if (fb) fb.innerHTML = '<span class="text-danger small">No camera device detected. Enter UID manually below.</span>';
+                }
+            }).catch(() => {
+                const fb = document.getElementById('scannerFeedback');
+                if (fb) fb.innerHTML = '<span class="text-danger small">Camera permissions not granted. Enter UID manually below.</span>';
+            });
+        });
+    }
+
+    function stopQrScanner() {
+        if (html5QrCode && html5QrCode.isScanning) {
+            html5QrCode.stop().then(() => {
+                html5QrCode.clear();
+            }).catch(err => console.error("Error stopping QR scanner:", err));
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        const modalEl = document.getElementById('qrScannerModal');
+        if (modalEl) {
+            modalEl.addEventListener('shown.bs.modal', function () {
+                startQrScanner();
+            });
+            modalEl.addEventListener('hidden.bs.modal', function () {
+                stopQrScanner();
+            });
+        }
+
+        // Manual Lookup Handler
+        const manualBtn = document.getElementById('manualLookupBtn');
+        const manualInput = document.getElementById('manualPatientInput');
+        if (manualBtn && manualInput) {
+            const executeLookup = () => {
+                const val = manualInput.value.trim();
+                if (val) {
+                    if (val.startsWith('http://') || val.startsWith('https://') || val.startsWith('/')) {
+                        window.location.href = val;
+                    } else {
+                        window.location.href = `/patient_card/${encodeURIComponent(val)}`;
+                    }
+                }
+            };
+            manualBtn.addEventListener('click', executeLookup);
+            manualInput.addEventListener('keypress', function (e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    executeLookup();
+                }
+            });
+        }
+    });
+    </script>
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>
