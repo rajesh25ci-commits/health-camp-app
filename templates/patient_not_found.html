@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block title %}Patient Record Not Found{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center align-items-center" style="min-height: 65vh;">
+    <div class="col-12 col-md-8 col-lg-6">
+        <div class="card border-0 shadow-lg rounded-4 overflow-hidden text-center bg-white p-4 p-md-5">
+            <div class="d-inline-flex align-items-center justify-content-center rounded-circle bg-danger bg-opacity-10 text-danger mb-4 mx-auto" style="width: 80px; height: 80px;">
+                <i class="fa-solid fa-qrcode fs-1"></i>
+            </div>
+
+            <h3 class="fw-bold text-dark mb-2">Patient Record Not Found</h3>
+            <p class="text-muted mb-3">
+                The scanned QR code or identifier <code class="fw-bold text-danger fs-6">{{ patient_id }}</code> could not be located in our Community Health Camp database.
+            </p>
+
+            <div class="alert alert-warning text-start small mb-4">
+                <i class="fa-solid fa-triangle-exclamation me-1 text-warning"></i>
+                <b>Possible reasons:</b>
+                <ul class="mb-0 mt-1 ps-3">
+                    <li>The patient QR code pass belongs to a different regional camp or health initiative.</li>
+                    <li>The patient registration record has not yet been synced or was deleted.</li>
+                    <li>The QR code or scanned URL contains an invalid UID parameter.</li>
+                </ul>
+            </div>
+
+            <div class="d-flex flex-column flex-sm-row justify-content-center gap-2">
+                <button type="button" class="btn btn-primary px-4 py-2 rounded-pill shadow-sm" data-bs-toggle="modal" data-bs-target="#qrScannerModal">
+                    <i class="fa-solid fa-camera me-1"></i> Scan Another QR Pass
+                </button>
+                <a href="{{ url_for('patients') }}" class="btn btn-outline-secondary px-4 py-2 rounded-pill">
+                    <i class="fa-solid fa-users me-1"></i> Search Patient Directory
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,337 @@
+{% extends "base.html" %}
+
+{% block title %}Patient Digital Verification - {{ patient.name }}{% endblock %}
+
+{% block head %}
+<style>
+/* Printable Digital ID Card Styles */
+@media print {
+    /* Hide everything except printable card */
+    body {
+        background-color: #ffffff !important;
+        color: #000000 !important;
+        font-size: 12pt;
+    }
+    .no-print, nav, footer, .modal, .alert, header {
+        display: none !important;
+    }
+    main {
+        padding: 0 !important;
+        margin: 0 !important;
+        min-height: auto !important;
+    }
+    .printable-card-wrapper {
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 100% !important;
+        max-width: 100% !important;
+    }
+    .card {
+        border: 2px solid #1e3a8a !important;
+        box-shadow: none !important;
+        page-break-inside: avoid;
+    }
+    .card-header {
+        background-color: #1e3a8a !important;
+        color: #ffffff !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+    .badge {
+        border: 1px solid #999 !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+}
+
+.id-card-shadow {
+    box-shadow: 0 10px 30px rgba(30, 58, 138, 0.12);
+}
+
+.photo-frame {
+    width: 150px;
+    height: 150px;
+    object-fit: cover;
+    border: 3px solid #e2e8f0;
+}
+
+.qr-frame {
+    width: 135px;
+    height: 135px;
+    object-fit: contain;
+}
+
+.rx-box {
+    background-color: #f8fafc;
+    border-left: 4px solid #10b981;
+}
+
+.diag-box {
+    background-color: #fef2f2;
+    border-left: 4px solid #ef4444;
+}
+
+.notes-box {
+    background-color: #f0fdf4;
+    border-left: 4px solid #3b82f6;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-3 printable-card-wrapper" style="max-width: 900px;">
+
+    <!-- Top Action Toolbar (Hidden during print) -->
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4 no-print">
+        <div class="d-flex align-items-center gap-2">
+            <a href="{{ url_for('patients') }}" class="btn btn-outline-secondary btn-sm rounded-pill px-3">
+                <i class="fas fa-arrow-left me-1"></i> All Patients
+            </a>
+            <a href="{{ url_for('patient_detail', patient_id=patient.patient_uid) }}" class="btn btn-outline-primary btn-sm rounded-pill px-3">
+                <i class="fas fa-user-circle me-1"></i> Detailed Profile
+            </a>
+        </div>
+
+        <div class="d-flex flex-wrap align-items-center gap-2">
+            <button type="button" onclick="window.print()" class="btn btn-primary btn-sm px-3 rounded-pill shadow-sm fw-semibold">
+                <i class="fas fa-print me-1"></i> Print ID Card
+            </button>
+            <a href="{{ url_for('patient_pdf', patient_id=patient.patient_uid) }}" class="btn btn-danger btn-sm px-3 rounded-pill shadow-sm fw-semibold">
+                <i class="fas fa-file-pdf me-1"></i> Download Medical Report
+            </a>
+            <a href="{{ url_for('records') }}?patient_id={{ patient.id }}" class="btn btn-success btn-sm px-3 rounded-pill shadow-sm fw-semibold">
+                <i class="fas fa-stethoscope me-1"></i> Start New Consultation
+            </a>
+        </div>
+    </div>
+
+    <!-- Official Printable Digital ID & Verification Card -->
+    <div class="card id-card-shadow border-0 rounded-4 overflow-hidden bg-white mb-4" id="printablePatientCard">
+
+        <!-- Card Header Banner -->
+        <div class="card-header bg-primary text-white p-4" style="background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%);">
+            <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="bg-white text-danger rounded-circle p-2 d-flex align-items-center justify-content-center shadow-sm" style="width: 48px; height: 48px;">
+                        <i class="fas fa-heart-pulse fs-4"></i>
+                    </div>
+                    <div>
+                        <span class="badge bg-white text-primary fw-bold text-uppercase px-2 py-1 mb-1" style="font-size: 0.7rem; letter-spacing: 0.5px;">
+                            Official Healthcare Pass
+                        </span>
+                        <h4 class="fw-bold mb-0 text-white tracking-tight">Smart Health Camp &bull; Patient Digital Verification</h4>
+                        <small class="text-white-50">Community Health Initiatives &bull; Biometric & Clinical Verification Card</small>
+                    </div>
+                </div>
+                <div class="text-md-end">
+                    <span class="badge bg-success bg-opacity-90 text-white px-3 py-2 rounded-pill fs-6 shadow-sm border border-success-subtle">
+                        <i class="fas fa-shield-halved me-1"></i> Verified Beneficiary
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <div class="card-body p-4 p-md-5">
+
+            <!-- Section 1: Demographics & Biometric Identity (Side-by-Side) -->
+            <div class="row g-4 align-items-center pb-4 border-bottom">
+
+                <!-- Left Column: Photo & Scannable QR -->
+                <div class="col-12 col-md-5 col-lg-4 text-center border-end-md">
+                    <div class="d-flex flex-column align-items-center gap-3">
+
+                        <!-- Large Patient Photo Box with Fallback -->
+                        <div class="position-relative">
+                            <img src="{{ photo_url }}"
+                                 alt="{{ patient.name }}"
+                                 onerror="this.onerror=null; this.src='{{ url_for('static', filename='uploads/default_avatar.png') }}';"
+                                 class="rounded-4 photo-frame shadow-sm">
+                            <span class="badge bg-primary text-white position-absolute bottom-0 start-50 translate-middle-x px-3 py-1 rounded-pill shadow-sm" style="font-size: 0.72rem;">
+                                Biometric Photo
+                            </span>
+                        </div>
+
+                        <!-- Permanent UID Badge -->
+                        <div>
+                            <div class="text-muted small fw-semibold text-uppercase" style="font-size: 0.7rem; letter-spacing: 0.5px;">Beneficiary UID</div>
+                            <span class="badge bg-dark font-monospace fs-6 px-3 py-2 rounded-pill shadow-sm mt-1">
+                                {{ patient.patient_uid }}
+                            </span>
+                        </div>
+
+                        <!-- Live Verification QR Code Box -->
+                        <div class="p-2 rounded-3 bg-light border text-center mt-1">
+                            <img src="{{ url_for('static', filename=patient.qr_code_path) if patient.qr_code_path else url_for('static', filename='qrcodes/default_qr.png') }}"
+                                 onerror="this.onerror=null; this.src='{{ url_for('static', filename='qrcodes/default_qr.png') }}';"
+                                 alt="QR Pass"
+                                 class="rounded qr-frame bg-white border p-1 shadow-sm">
+                            <div class="small fw-bold text-primary mt-1" style="font-size: 0.75rem;">
+                                <i class="fas fa-qrcode me-1"></i>Live QR Pass
+                            </div>
+                            <div class="text-muted font-monospace text-truncate mt-1 px-1" style="font-size: 0.65rem; max-width: 170px;" title="{{ verification_url }}">
+                                {{ verification_url }}
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- Right Column: Patient Information & Key Badges -->
+                <div class="col-12 col-md-7 col-lg-8">
+                    <div class="ps-md-3">
+                        <div class="mb-3">
+                            <span class="text-muted small fw-semibold text-uppercase" style="font-size: 0.72rem; letter-spacing: 0.5px;">Full Legal Name</span>
+                            <h2 class="fw-bold text-dark mb-2">{{ patient.name }}</h2>
+                            <div class="d-flex flex-wrap gap-2">
+                                <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-3 py-2 fs-6 rounded-pill">
+                                    <i class="fas fa-calendar-days me-1"></i> {{ patient.age }} Years Old
+                                </span>
+                                <span class="badge bg-info-subtle text-info border border-info-subtle px-3 py-2 fs-6 rounded-pill">
+                                    <i class="fas fa-venus-mars me-1"></i> {{ patient.gender }}
+                                </span>
+                                <span class="badge bg-success-subtle text-success border border-success-subtle px-3 py-2 fs-6 rounded-pill">
+                                    <i class="fas fa-id-badge me-1"></i> Active Camp Enrollee
+                                </span>
+                            </div>
+                        </div>
+
+                        <div class="row g-3 mt-1">
+                            <div class="col-12 col-sm-6">
+                                <div class="p-3 rounded-3 bg-light border h-100">
+                                    <span class="text-muted small fw-semibold d-block mb-1">
+                                        <i class="fas fa-phone text-primary me-1"></i> Contact Number
+                                    </span>
+                                    <span class="fw-bold text-dark font-monospace fs-6">
+                                        {{ patient.phone or 'Not Provided' }}
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="col-12 col-sm-6">
+                                <div class="p-3 rounded-3 bg-light border h-100">
+                                    <span class="text-muted small fw-semibold d-block mb-1">
+                                        <i class="far fa-calendar-check text-success me-1"></i> Registration Date
+                                    </span>
+                                    <span class="fw-bold text-dark fs-6">
+                                        {{ patient.created_at.strftime('%d %B %Y') }}
+                                    </span>
+                                    <small class="text-muted d-block">{{ patient.created_at.strftime('%I:%M %p') }}</small>
+                                </div>
+                            </div>
+                            <div class="col-12">
+                                <div class="p-3 rounded-3 bg-light border">
+                                    <span class="text-muted small fw-semibold d-block mb-1">
+                                        <i class="fas fa-location-dot text-danger me-1"></i> Address / Residential Ward
+                                    </span>
+                                    <span class="text-dark fw-medium">
+                                        {{ patient.address or 'Community Camp Registered - Residential Address on file with local outreach' }}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Section 2: Recent Medical Consultation & Diagnosis -->
+            <div class="pt-4">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="fw-bold text-dark mb-0">
+                        <i class="fas fa-notes-medical text-primary me-2"></i>Latest Medical Consultation & Clinical Record
+                    </h5>
+                    {% if latest_record %}
+                    <span class="badge bg-light text-muted border px-2 py-1 small">
+                        Recorded on {{ latest_record.created_at.strftime('%d %b %Y') }}
+                    </span>
+                    {% endif %}
+                </div>
+
+                {% if latest_record %}
+                <div class="card border rounded-3 p-4 bg-white shadow-sm">
+
+                    <!-- Consultation Metadata Row -->
+                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 pb-3 mb-3 border-bottom">
+                        <div class="d-flex align-items-center gap-2">
+                            <div class="bg-primary-subtle text-primary rounded-circle p-2 d-flex align-items-center justify-content-center" style="width: 40px; height: 40px;">
+                                <i class="fas fa-user-doctor fs-5"></i>
+                            </div>
+                            <div>
+                                <span class="fw-bold text-dark d-block">
+                                    {{ latest_record.doctor.name if latest_record.doctor else 'Empaneled Medical Officer' }}
+                                </span>
+                                <small class="text-muted">
+                                    {{ latest_record.doctor.specialization if latest_record.doctor else 'General Medicine & Family Health' }}
+                                </small>
+                            </div>
+                        </div>
+                        <div class="text-end">
+                            <div class="badge bg-primary-subtle text-primary border border-primary-subtle px-3 py-1">
+                                <i class="fas fa-tent me-1"></i>{{ latest_record.camp.title if latest_record.camp else 'Outreach Camp' }}
+                            </div>
+                            <small class="text-muted d-block mt-1 font-monospace">
+                                Date: {{ latest_record.created_at.strftime('%d %B %Y, %I:%M %p') }}
+                            </small>
+                        </div>
+                    </div>
+
+                    <!-- Clinical Diagnosis -->
+                    <div class="p-3 rounded-3 diag-box mb-3">
+                        <span class="fw-bold text-danger text-uppercase small d-block mb-1" style="letter-spacing: 0.5px;">
+                            <i class="fas fa-stethoscope me-1"></i> Clinical Diagnosis & Vitals
+                        </span>
+                        <div class="fs-6 text-dark fw-semibold">
+                            {{ latest_record.diagnosis }}
+                        </div>
+                    </div>
+
+                    <!-- Prescribed Medicines -->
+                    <div class="p-3 rounded-3 rx-box mb-3">
+                        <span class="fw-bold text-success text-uppercase small d-block mb-1" style="letter-spacing: 0.5px;">
+                            <i class="fas fa-pills me-1"></i> Prescribed Medicines & Dosage Instructions
+                        </span>
+                        <div class="text-dark fw-medium font-monospace" style="white-space: pre-line; line-height: 1.6;">
+                            {{ latest_record.prescription or 'No prescription medicines recorded.' }}
+                        </div>
+                    </div>
+
+                    <!-- Doctor Advice & Notes -->
+                    {% if latest_record.doctor_notes %}
+                    <div class="p-3 rounded-3 notes-box">
+                        <span class="fw-bold text-primary text-uppercase small d-block mb-1" style="letter-spacing: 0.5px;">
+                            <i class="fas fa-comment-medical me-1"></i> Clinical Notes & Dietary Advice
+                        </span>
+                        <div class="text-dark small" style="white-space: pre-line;">
+                            {{ latest_record.doctor_notes }}
+                        </div>
+                    </div>
+                    {% endif %}
+
+                </div>
+                {% else %}
+                <div class="alert alert-light border rounded-3 p-4 text-center">
+                    <i class="fas fa-clipboard-question text-muted fs-1 mb-2 d-block"></i>
+                    <h6 class="fw-bold text-dark">No Consultations Recorded Yet</h6>
+                    <p class="text-muted small mb-3">This beneficiary is officially registered in our community system. Click below to begin their clinical examination.</p>
+                    <a href="{{ url_for('records') }}?patient_id={{ patient.id }}" class="btn btn-outline-primary btn-sm rounded-pill px-4">
+                        <i class="fas fa-plus me-1"></i> Record Initial Consultation
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Card Bottom Security Footer -->
+            <div class="mt-4 pt-3 border-top d-flex flex-column flex-md-row justify-content-between align-items-center text-muted small">
+                <div>
+                    <i class="fas fa-shield-check text-success me-1"></i>
+                    Official Encrypted Verification Document &bull; Smart Community Health Camp
+                </div>
+                <div class="mt-2 mt-md-0 font-monospace" style="font-size: 0.7rem;">
+                    PASS-VERIFY-{{ patient.patient_uid }}-{{ patient.id }}
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+</div>
+{% endblock %}
