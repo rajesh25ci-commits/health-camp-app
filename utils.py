@@ -423,7 +423,84 @@ def generate_patient_pdf(patient, health_records=None, output_path: str = None):
         ]))
         story.append(records_table)
 
-    story.append(Spacer(1, 24))
+    story.append(Spacer(1, 14))
+
+    # --- Daily Medicine Dosage Timings (Bilingual) ---
+    story.append(Paragraph("Daily Medicine Dosage Timings / दवाइयों का समय", section_title))
+    timing_data = [
+        [
+            Paragraph("<b>Morning / सुबह (08:00 AM)</b>", body_bold),
+            Paragraph("<b>Afternoon / दोपहर (01:30 PM)</b>", body_bold),
+            Paragraph("<b>Night / रात (08:30 PM)</b>", body_bold)
+        ],
+        [
+            Paragraph("<font size=8 color='#1E3A8A'>Take after breakfast (नाश्ते के बाद). BP, thyroid, and daily morning tablets.</font>", body_style),
+            Paragraph("<font size=8 color='#1E3A8A'>Take after lunch (दोपहर भोजन के बाद). Antibiotics and digestive doses.</font>", body_style),
+            Paragraph("<font size=8 color='#1E3A8A'>Take after dinner (रात भोजन के बाद). Cholesterol, night sugar, and allergy relief.</font>", body_style)
+        ]
+    ]
+    timing_table = Table(timing_data, colWidths=[174, 174, 174])
+    timing_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#EFF6FF')),
+        ('BACKGROUND', (0, 1), (-1, 1), colors.HexColor('#F8FAFC')),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#BFDBFE')),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('PADDING', (0, 0), (-1, -1), 6),
+    ]))
+    story.append(timing_table)
+    story.append(Spacer(1, 12))
+
+    # --- Personalized Indian Food & Diet Recommendation ---
+    story.append(Paragraph("Personalized Indian Food & Diet Guidance / आहार परामर्श", section_title))
+    
+    latest_diag = ""
+    latest_sys = None
+    latest_rbs = None
+    if records_list:
+        latest_rec = records_list[0]
+        latest_diag = getattr(latest_rec, 'diagnosis', '') or ''
+        latest_sys = getattr(latest_rec, 'systolic_bp', None)
+        latest_rbs = getattr(latest_rec, 'blood_sugar', None)
+
+    try:
+        from upgraded_features import recommend_diet_plan
+        diet_plan = recommend_diet_plan(latest_diag, systolic=latest_sys, rbs=latest_rbs)
+        eat_items = "<br/>".join([f"&bull; {item}" for item in diet_plan['foods_to_eat'][:4]])
+        avoid_items = "<br/>".join([f"&bull; {item}" for item in diet_plan['foods_to_avoid'][:4]])
+        tip_text = diet_plan.get('lifestyle_tip', 'Maintain regular meal timings and drink adequate safe water.')
+    except Exception:
+        eat_items = "&bull; Lauki, cucumber, seasonal vegetables<br/>&bull; Whole grain dalia, wheat/jowar rotis<br/>&bull; Plenty of clean water"
+        avoid_items = "&bull; Pickles (Aachar), papad, extra salt<br/>&bull; Deep fried snacks (Samosa, Pakoda)<br/>&bull; Excessive sugar and sweets"
+        tip_text = "Practice 30 minutes of walking daily and avoid excessive salt/sugar."
+
+    diet_data = [
+        [
+            Paragraph("<b>Foods to Eat / खाने योग्य आहार</b>", body_bold),
+            Paragraph("<b>Foods to Avoid / परहेज योग्य आहार</b>", body_bold)
+        ],
+        [
+            Paragraph(f"<font size=8 color='#166534'>{eat_items}</font>", body_style),
+            Paragraph(f"<font size=8 color='#991B1B'>{avoid_items}</font>", body_style)
+        ],
+        [
+            Paragraph(f"<b>Lifestyle Tip:</b> <font size=8 color='#374151'>{tip_text}</font>", body_style),
+            ""
+        ]
+    ]
+    diet_table = Table(diet_data, colWidths=[261, 261])
+    diet_table.setStyle(TableStyle([
+        ('SPAN', (0, 2), (1, 2)),
+        ('BACKGROUND', (0, 0), (0, 0), colors.HexColor('#DCFCE7')),
+        ('BACKGROUND', (1, 0), (1, 0), colors.HexColor('#FEE2E2')),
+        ('BACKGROUND', (0, 1), (0, 1), colors.HexColor('#F0FDF4')),
+        ('BACKGROUND', (1, 1), (1, 1), colors.HexColor('#FEF2F2')),
+        ('BACKGROUND', (0, 2), (-1, 2), colors.HexColor('#F3F4F6')),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#D1D5DB')),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('PADDING', (0, 0), (-1, -1), 6),
+    ]))
+    story.append(diet_table)
+    story.append(Spacer(1, 16))
 
     # --- Authorization & Signature Section ---
     sig_data = [

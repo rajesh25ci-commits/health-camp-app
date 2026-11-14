@@ -6,15 +6,44 @@
 <div class="row justify-content-center">
     <div class="col-12 col-xl-11">
 
+        <!-- Critical Vitals Emergency Triage Banner -->
+        {% if critical_records %}
+        <div class="alert alert-danger border-2 border-danger shadow-lg rounded-4 p-4 mb-4 position-relative" role="alert">
+            <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="bg-danger text-white rounded-circle p-3 d-flex align-items-center justify-content-center shadow" style="width: 56px; height: 56px; min-width: 56px;">
+                        <i class="fas fa-truck-medical fs-3 fa-beat"></i>
+                    </div>
+                    <div>
+                        <span class="badge bg-danger text-white text-uppercase px-2 py-1 mb-1 font-monospace" style="letter-spacing: 1px;">
+                            <i class="fas fa-triangle-exclamation me-1"></i> EMERGENCY RED-FLAG TRIAGE ({{ critical_records|length }} Flagged)
+                        </span>
+                        <h4 class="fw-bold mb-1 text-danger">CRITICAL VITALS DETECTED - IMMEDIATE 108 AMBULANCE DISPATCH REQUIRED</h4>
+                        <div class="text-dark small">
+                            Patients flagged in the clinical queue have life-threatening hypertensive, respiratory, or diabetic crisis.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="d-flex flex-wrap align-items-center gap-2">
+                    <a href="tel:108" class="btn btn-danger btn-lg px-4 py-2 rounded-pill fw-bold shadow d-flex align-items-center gap-2">
+                        <i class="fas fa-phone-volume fs-5"></i>
+                        <span>CALL AMBULANCE (108)</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
         <!-- Page Header & Action -->
         <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
             <div>
                 <h3 class="fw-bold mb-1 text-dark">
                     <i class="fa-solid fa-notes-medical text-primary me-2"></i>Clinical Health Records & Prescriptions
                 </h3>
-                <p class="text-muted mb-0 small">Consultation notes, diagnoses, medications issued, and official clinical summaries.</p>
+                <p class="text-muted mb-0 small">Consultation notes, vitals triage, automated medicine schedules, and emergency ambulance referral.</p>
             </div>
-            <div>
+            <div class="d-flex align-items-center gap-2">
                 <button type="button" class="btn btn-primary px-4 py-2 rounded-pill shadow-sm" data-bs-toggle="modal" data-bs-target="#newRecordModal">
                     <i class="fa-solid fa-plus me-2"></i>Record Clinical Encounter
                 </button>
@@ -22,12 +51,12 @@
         </div>
 
         <!-- Records Table -->
-        <div class="card border-0 shadow-sm rounded-4 bg-white">
+        <div class="card border-0 shadow-sm rounded-4 bg-white mb-4">
             <div class="card-header bg-white py-3 px-4 border-bottom d-flex justify-content-between align-items-center">
                 <span class="fw-bold text-dark">
                     Recorded Consultations ({{ records|length }})
                 </span>
-                <span class="text-muted small">Official clinical encounters</span>
+                <span class="text-muted small">Prioritized by Critical Vitals Triage</span>
             </div>
             <div class="card-body p-0">
                 <div class="table-responsive">
@@ -36,17 +65,17 @@
                             <tr class="small text-muted text-uppercase">
                                 <th class="ps-4">Encounter Date</th>
                                 <th>Patient Beneficiary</th>
-                                <th>Attending Doctor</th>
-                                <th>Camp Location</th>
+                                <th>Doctor & Camp</th>
+                                <th>Vitals & Triage</th>
                                 <th>Clinical Diagnosis</th>
                                 <th>Prescription & Notes</th>
-                                <th class="text-end pe-4">Medical PDF</th>
+                                <th class="text-end pe-4">Actions & Referral</th>
                             </tr>
                         </thead>
                         <tbody>
                             {% if records %}
                                 {% for r in records %}
-                                <tr>
+                                <tr class="{% if r.is_critical %}table-danger border-start border-danger border-4{% endif %}">
                                     <td class="ps-4">
                                         <div class="fw-bold text-dark">{{ r.created_at.strftime('%d %b %Y') }}</div>
                                         <small class="text-muted">{{ r.created_at.strftime('%H:%M') }}</small>
@@ -56,7 +85,21 @@
                                             <a href="{{ url_for('patient_detail', id=r.patient.id) }}" class="fw-bold text-primary text-decoration-none d-block">
                                                 {{ r.patient.name }}
                                             </a>
-                                            <span class="badge bg-secondary-subtle text-secondary font-monospace">{{ r.patient.patient_uid }}</span>
+                                            <div class="d-flex align-items-center gap-1 mt-1 flex-wrap">
+                                                <span class="badge bg-secondary-subtle text-secondary font-monospace">{{ r.patient.patient_uid }}</span>
+                                                {% if r.patient.urgency_level == 'EMERGENCY' %}
+                                                    <span class="badge bg-danger text-white pulse-emergency" style="font-size: 0.68rem;">🔴 EMERGENCY</span>
+                                                {% elif r.patient.urgency_level == 'URGENT' %}
+                                                    <span class="badge bg-warning text-dark fw-bold" style="font-size: 0.68rem;">🟡 URGENT</span>
+                                                {% elif r.patient.urgency_level == 'NORMAL' %}
+                                                    <span class="badge bg-success-subtle text-success border border-success-subtle" style="font-size: 0.68rem;">🟢 NORMAL</span>
+                                                {% endif %}
+                                            </div>
+                                            {% if r.patient.symptoms %}
+                                                <div class="small text-muted mt-1" style="max-width: 210px; font-size: 0.76rem;">
+                                                    <i class="fas fa-stethoscope text-primary me-1"></i><span class="text-dark fw-semibold">Symptoms:</span> {{ r.patient.symptoms|truncate(40) }}
+                                                </div>
+                                            {% endif %}
                                         {% else %}
                                             <span class="text-muted">Unlinked Patient</span>
                                         {% endif %}
@@ -64,18 +107,36 @@
                                     <td>
                                         {% if r.doctor %}
                                             <div class="fw-semibold text-dark">{{ r.doctor.name }}</div>
-                                            <small class="text-muted">{{ r.doctor.specialization }}</small>
-                                        {% else %}
-                                            <span class="text-muted">Medical Officer</span>
+                                            <small class="text-muted d-block">{{ r.doctor.specialization }}</small>
+                                        {% endif %}
+                                        {% if r.camp %}
+                                            <small class="text-muted"><i class="fas fa-location-dot me-1 text-danger"></i>{{ r.camp.location_name }}</small>
                                         {% endif %}
                                     </td>
                                     <td>
-                                        {% if r.camp %}
-                                            <div class="small fw-semibold text-dark">{{ r.camp.title }}</div>
-                                            <small class="text-muted">{{ r.camp.location_name }}</small>
+                                        {% if r.is_critical %}
+                                            <span class="badge bg-danger text-white mb-1 d-inline-block">
+                                                <i class="fas fa-triangle-exclamation me-1"></i>RED-FLAG EMERGENCY
+                                            </span>
                                         {% else %}
-                                            <span class="text-muted small">General Outreach</span>
+                                            <span class="badge bg-success-subtle text-success border border-success-subtle mb-1 d-inline-block">
+                                                <i class="fas fa-circle-check me-1"></i>NORMAL
+                                            </span>
                                         {% endif %}
+                                        <div class="small font-monospace text-dark" style="font-size: 0.78rem;">
+                                            {% if r.systolic_bp and r.diastolic_bp %}
+                                                BP: <b>{{ r.systolic_bp }}/{{ r.diastolic_bp }}</b> |
+                                            {% endif %}
+                                            {% if r.spo2 %}
+                                                SpO2: <b>{{ r.spo2 }}%</b> |
+                                            {% endif %}
+                                            {% if r.blood_sugar %}
+                                                RBS: <b>{{ r.blood_sugar }}</b>
+                                            {% endif %}
+                                            {% if not r.systolic_bp and not r.spo2 and not r.blood_sugar %}
+                                                <span class="text-muted">Vitals not entered</span>
+                                            {% endif %}
+                                        </div>
                                     </td>
                                     <td>
                                         <span class="badge bg-danger-subtle text-danger border border-danger-subtle px-2 py-1">
@@ -91,11 +152,22 @@
                                         {% endif %}
                                     </td>
                                     <td class="text-end pe-4">
-                                        {% if r.patient %}
-                                            <a href="{{ url_for('patient_pdf', id=r.patient.id) }}" class="btn btn-sm btn-outline-danger rounded-pill px-3" title="Download Official Medical Card">
-                                                <i class="fa-solid fa-file-pdf me-1"></i> PDF Card
-                                            </a>
-                                        {% endif %}
+                                        <div class="d-flex justify-content-end gap-1 flex-wrap">
+                                            {% if r.patient %}
+                                                {% if r.is_critical %}
+                                                <form method="POST" action="{{ url_for('features_bp.dispatch_ambulance', patient_id=r.patient.patient_uid) }}" onsubmit="return confirm('Confirm dispatching 108 Emergency Ambulance for patient {{ r.patient.name }}?');" class="d-inline">
+                                                    <input type="hidden" name="vitals_summary" value="BP: {{ r.systolic_bp }}/{{ r.diastolic_bp }}, SpO2: {{ r.spo2 }}%, RBS: {{ r.blood_sugar }}">
+                                                    <input type="hidden" name="chief_complaint" value="{{ r.diagnosis }}">
+                                                    <button type="submit" class="btn btn-sm btn-danger rounded-pill px-2" title="Log 108 Ambulance Dispatch">
+                                                        <i class="fas fa-truck-medical me-1"></i> 108 Dispatch
+                                                    </button>
+                                                </form>
+                                                {% endif %}
+                                                <a href="{{ url_for('patient_pdf', id=r.patient.id) }}" class="btn btn-sm btn-outline-danger rounded-pill px-2" title="Download Official Medical Card">
+                                                    <i class="fa-solid fa-file-pdf me-1"></i> PDF
+                                                </a>
+                                            {% endif %}
+                                        </div>
                                     </td>
                                 </tr>
                                 {% endfor %}
@@ -111,6 +183,47 @@
                 </div>
             </div>
         </div>
+
+        <!-- Ambulance Referral Logs Card -->
+        {% if ambulance_logs %}
+        <div class="card border-0 shadow-sm rounded-4 bg-white mb-4">
+            <div class="card-header bg-white py-3 px-4 border-bottom d-flex justify-content-between align-items-center">
+                <span class="fw-bold text-danger">
+                    <i class="fas fa-truck-medical me-2"></i>Emergency 108 Ambulance Referral Logs (Recent)
+                </span>
+                <span class="badge bg-danger text-white rounded-pill">{{ ambulance_logs|length }} Referred</span>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0 small">
+                        <thead class="table-light">
+                            <tr>
+                                <th class="ps-4">Dispatch Time</th>
+                                <th>Patient UID / Name</th>
+                                <th>Critical Vitals</th>
+                                <th>Referral Hospital</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for log in ambulance_logs %}
+                            <tr>
+                                <td class="ps-4 font-monospace">{{ log.dispatched_at.strftime('%d %b %Y, %H:%M') }}</td>
+                                <td>
+                                    <b>{{ log.patient.name if log.patient else 'Beneficiary' }}</b>
+                                    <span class="badge bg-secondary-subtle text-secondary font-monospace">{{ log.patient.patient_uid if log.patient else '' }}</span>
+                                </td>
+                                <td class="text-danger fw-semibold">{{ log.vitals_summary or 'Critical Emergency' }}</td>
+                                <td><i class="fas fa-hospital me-1 text-primary"></i>{{ log.hospital_destination }}</td>
+                                <td><span class="badge bg-danger">{{ log.status }}</span></td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        {% endif %}
 
     </div>
 </div>
@@ -134,7 +247,7 @@
                                 <option value="">-- Choose Patient --</option>
                                 {% for p in patients %}
                                 <option value="{{ p.id }}" {% if selected_patient_id == p.id %}selected{% endif %}>
-                                    {{ p.name }} ({{ p.patient_uid }})
+                                    {% if p.urgency_level == 'EMERGENCY' %}🔴 [EMERGENCY]{% elif p.urgency_level == 'URGENT' %}🟡 [URGENT]{% else %}🟢{% endif %} {{ p.name }} ({{ p.patient_uid }}){% if p.symptoms %} - {{ p.symptoms|truncate(35) }}{% endif %}
                                 </option>
                                 {% endfor %}
                             </select>
@@ -157,24 +270,72 @@
                                 {% endfor %}
                             </select>
                         </div>
+
+                        <!-- Vital Signs & Red-Flag Triage Fields -->
+                        <div class="col-12">
+                            <div class="p-3 rounded-3 bg-light border">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <label class="fw-bold text-dark mb-0">
+                                        <i class="fas fa-heart-pulse text-danger me-1"></i> Vital Signs (Critical Triage Assessment)
+                                    </label>
+                                    <span class="badge bg-danger-subtle text-danger" style="font-size: 0.72rem;">
+                                        BP &ge;180/120 or &lt;90/60 &bull; SpO2 &lt;92% &bull; RBS &ge;300 &rarr; 108 Emergency
+                                    </span>
+                                </div>
+                                <div class="row g-2">
+                                    <div class="col-6 col-md-3">
+                                        <label class="small text-muted fw-semibold">Systolic BP (mmHg)</label>
+                                        <input type="number" class="form-control form-control-sm" name="systolic_bp" placeholder="e.g. 120">
+                                    </div>
+                                    <div class="col-6 col-md-3">
+                                        <label class="small text-muted fw-semibold">Diastolic BP (mmHg)</label>
+                                        <input type="number" class="form-control form-control-sm" name="diastolic_bp" placeholder="e.g. 80">
+                                    </div>
+                                    <div class="col-4 col-md-2">
+                                        <label class="small text-muted fw-semibold">Blood Sugar</label>
+                                        <input type="number" step="0.1" class="form-control form-control-sm" name="blood_sugar" placeholder="RBS mg/dL">
+                                    </div>
+                                    <div class="col-4 col-md-2">
+                                        <label class="small text-muted fw-semibold">SpO2 (%)</label>
+                                        <input type="number" step="0.1" class="form-control form-control-sm" name="spo2" placeholder="e.g. 98">
+                                    </div>
+                                    <div class="col-4 col-md-2">
+                                        <label class="small text-muted fw-semibold">Pulse (bpm)</label>
+                                        <input type="number" class="form-control form-control-sm" name="pulse_rate" placeholder="e.g. 72">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
                         <div class="col-12">
                             <label class="form-label fw-semibold">Primary Diagnosis <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control" name="diagnosis" placeholder="e.g. Acute Upper Respiratory Tract Infection / Hypertension Grade 1" required>
+                            <input type="text" class="form-control" name="diagnosis" placeholder="e.g. Hypertension Grade 2 / Type 2 Diabetes / Respiratory Infection" required>
                         </div>
                         <div class="col-12">
-                            <label class="form-label fw-semibold">Prescription & Medication Dosage</label>
-                            <textarea class="form-control font-monospace" name="prescription" rows="3" placeholder="e.g. Paracetamol 500mg - 1 tab TDS after food x 3 days&#10;Amoxicillin 250mg - 1 cap BD x 5 days"></textarea>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <label class="form-label fw-semibold mb-1">Prescription & Medication Dosage</label>
+                                <span class="badge bg-primary-subtle text-primary" style="font-size: 0.7rem;">Stock auto-deducted from pharmacy inventory</span>
+                            </div>
+                            <textarea class="form-control font-monospace" name="prescription" rows="3" placeholder="e.g. Paracetamol 500mg - 1 tab TDS after food x 3 days&#10;Amoxicillin 500mg - 1 cap BD x 5 days&#10;Metformin 500mg - 1 tab BD"></textarea>
+                            {% if inventory_items %}
+                            <small class="text-muted d-block mt-1">
+                                Available pharmacy items:
+                                {% for item in inventory_items[:6] %}
+                                    <span class="badge bg-light text-dark border">{{ item.name }} ({{ item.stock }} left)</span>
+                                {% endfor %}
+                            </small>
+                            {% endif %}
                         </div>
                         <div class="col-12">
-                            <label class="form-label fw-semibold">Doctor Clinical Notes / Advice</label>
-                            <textarea class="form-control" name="doctor_notes" rows="2" placeholder="e.g. Adequate hydration recommended. Follow-up at next camp if symptoms persist."></textarea>
+                            <label class="form-label fw-semibold">Doctor Clinical Notes / Dietary Advice</label>
+                            <textarea class="form-control" name="doctor_notes" rows="2" placeholder="e.g. Reduce daily table salt intake. Adequate water intake recommended."></textarea>
                         </div>
                     </div>
                 </div>
                 <div class="modal-footer bg-light">
                     <button type="button" class="btn btn-secondary px-3" data-bs-dismiss="modal">Cancel</button>
                     <button type="submit" class="btn btn-primary px-4">
-                        <i class="fa-solid fa-check me-1"></i> Save Clinical Record
+                        <i class="fa-solid fa-check me-1"></i> Save Clinical Record & Triage
                     </button>
                 </div>
             </form>

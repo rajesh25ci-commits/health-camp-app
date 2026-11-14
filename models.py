@@ -67,6 +67,8 @@ class Patient(db.Model):
     photo_filename = db.Column(db.String(255), nullable=True)
     qr_code_path = db.Column(db.String(255), nullable=True)  # relative path, e.g., 'qrcodes/PAT-2026-0001.png'
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    symptoms = db.Column(db.Text, nullable=True)  # Chief complaints ('Kya Hua Hai?')
+    urgency_level = db.Column(db.String(20), default='NORMAL', nullable=False)  # 'NORMAL', 'URGENT', 'EMERGENCY'
 
     # Relationships
     appointments = db.relationship('Appointment', backref='patient', lazy=True, cascade='all, delete-orphan')
@@ -89,6 +91,8 @@ class Patient(db.Model):
             'address': self.address,
             'photo_filename': self.photo_filename,
             'qr_code_path': self.qr_code_path,
+            'symptoms': self.symptoms,
+            'urgency_level': self.urgency_level,
             'created_at': self.created_at.strftime('%Y-%m-%d %H:%M:%S')
         }
 
@@ -181,6 +185,13 @@ class Appointment(db.Model):
     time = db.Column(db.String(20), nullable=False)  # e.g., '10:00 AM'
     status = db.Column(db.String(20), default='Scheduled', nullable=False)  # 'Scheduled', 'In-Progress', 'Completed', 'Cancelled'
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    systolic_bp = db.Column(db.Integer, nullable=True)
+    diastolic_bp = db.Column(db.Integer, nullable=True)
+    blood_sugar = db.Column(db.Float, nullable=True)
+    spo2 = db.Column(db.Float, nullable=True)
+    pulse_rate = db.Column(db.Integer, nullable=True)
+    is_critical = db.Column(db.Boolean, default=False, nullable=True)
+    triage_priority = db.Column(db.String(20), default='NORMAL_GREEN', nullable=True)
 
     def to_dict(self) -> dict:
         return {
@@ -215,6 +226,13 @@ class HealthRecord(db.Model):
     prescription = db.Column(db.Text, nullable=True)
     doctor_notes = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    systolic_bp = db.Column(db.Integer, nullable=True)
+    diastolic_bp = db.Column(db.Integer, nullable=True)
+    blood_sugar = db.Column(db.Float, nullable=True)
+    spo2 = db.Column(db.Float, nullable=True)
+    pulse_rate = db.Column(db.Integer, nullable=True)
+    is_critical = db.Column(db.Boolean, default=False, nullable=True)
+    triage_priority = db.Column(db.String(20), default='NORMAL_GREEN', nullable=True)
 
     def to_dict(self) -> dict:
         return {

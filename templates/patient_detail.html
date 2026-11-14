@@ -19,11 +19,21 @@
                 </a>
                 {% endif %}
                 <div>
-                    <h3 class="fw-bold mb-0 text-dark d-flex align-items-center gap-2">
+                    <h3 class="fw-bold mb-0 text-dark d-flex align-items-center gap-2 flex-wrap">
                         <span>{{ patient.name }}</span>
-                        <span class="badge bg-success-subtle text-success border border-success-subtle fs-6 py-1 px-3 rounded-pill fw-medium">
-                            <i class="fa-solid fa-circle-check me-1"></i>Verified Beneficiary
-                        </span>
+                        {% if patient.urgency_level == 'EMERGENCY' %}
+                            <span class="badge bg-danger text-white pulse-emergency fs-6 py-1 px-3 rounded-pill">
+                                <i class="fas fa-truck-medical me-1"></i>EMERGENCY #1
+                            </span>
+                        {% elif patient.urgency_level == 'URGENT' %}
+                            <span class="badge bg-warning text-dark border border-warning fs-6 py-1 px-3 rounded-pill">
+                                <i class="fas fa-bell me-1"></i>URGENT
+                            </span>
+                        {% else %}
+                            <span class="badge bg-success-subtle text-success border border-success-subtle fs-6 py-1 px-3 rounded-pill fw-medium">
+                                <i class="fa-solid fa-circle-check me-1"></i>Verified Beneficiary
+                            </span>
+                        {% endif %}
                     </h3>
                     <div class="d-flex align-items-center gap-2 mt-1">
                         <span class="badge bg-primary font-monospace">{{ patient.patient_uid }}</span>
@@ -39,7 +49,7 @@
                 </a>
                 {% if current_user.is_authenticated %}
                 <a href="{{ url_for('patient_pdf', patient_id=patient.patient_uid) }}" class="btn btn-danger px-4 py-2 rounded-pill shadow-sm">
-                    <i class="fa-solid fa-file-pdf me-2"></i>Download Official PDF Medical Card
+                    <i class="fa-solid fa-file-pdf me-2"></i>Download PDF Card
                 </a>
                 <a href="{{ url_for('records') }}?patient_id={{ patient.id }}" class="btn btn-outline-primary px-3 py-2 rounded-pill shadow-sm">
                     <i class="fa-solid fa-stethoscope me-1"></i>New Encounter
@@ -52,11 +62,114 @@
             </div>
         </div>
 
-        <!-- Demographic Profile Card with Photo & QR Code Side-by-Side -->
-        <div class="card border-0 shadow-sm rounded-4 mb-4 bg-white overflow-hidden">
-            <div class="card-header bg-primary text-white py-3 px-4 d-flex justify-content-between align-items-center">
+        <!-- 4-STEP GAMIFIED PATIENT JOURNEY TRACKER & WELLNESS SCORE ROW -->
+        <div class="row g-4 mb-4">
+            <!-- 4-Step Stepper -->
+            <div class="col-12 col-lg-8">
+                <div class="card border-0 shadow-sm rounded-4 bg-white p-4 h-100 hover-lift">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h6 class="fw-bold text-dark mb-0">
+                            <i class="fas fa-route text-primary me-2"></i>Clinical Care Journey Tracker
+                        </h6>
+                        <span class="badge bg-primary-subtle text-primary border border-primary-subtle font-monospace" style="font-size: 0.72rem;">
+                            Step-by-Step Triage
+                        </span>
+                    </div>
+
+                    <div class="journey-stepper my-3">
+                        {% for st in journey_steps %}
+                        <div class="stepper-item {% if st.completed %}completed{% elif st.active %}active{% endif %}">
+                            <div class="stepper-circle">
+                                {% if st.completed %}
+                                    <i class="fas fa-check"></i>
+                                {% else %}
+                                    <i class="fas {{ st.icon }}"></i>
+                                {% endif %}
+                            </div>
+                            <div class="stepper-title">{{ st.step }}. {{ st.title }}</div>
+                            <div class="stepper-sub">{{ st.sub }}</div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Patient Health Wellness Score Card -->
+            <div class="col-12 col-lg-4">
+                <div class="card border-0 shadow-sm rounded-4 bg-white p-4 h-100 hover-lift">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h6 class="fw-bold text-dark mb-0">
+                            <i class="fas fa-heart-pulse text-danger me-2"></i>Health Wellness Score
+                        </h6>
+                        <span class="badge bg-{{ wellness.badge_class }}-subtle text-{{ wellness.badge_class }} border border-{{ wellness.badge_class }}-subtle">
+                            {{ wellness.label }}
+                        </span>
+                    </div>
+
+                    <div class="d-flex align-items-center justify-content-between my-2">
+                        <div>
+                            <div class="display-5 fw-bold text-{{ wellness.badge_class }} font-monospace mb-0">
+                                {{ wellness.score }}<span class="fs-6 text-muted">/100</span>
+                            </div>
+                            <small class="text-muted">Calculated from Vitals & Triage</small>
+                        </div>
+                        <div class="rounded-circle p-3 d-flex align-items-center justify-content-center bg-{{ wellness.badge_class }}-subtle text-{{ wellness.badge_class }}" style="width: 58px; height: 58px;">
+                            <i class="fas {{ wellness.icon }} fs-3"></i>
+                        </div>
+                    </div>
+
+                    <div class="progress rounded-pill bg-light border mt-2" style="height: 10px;">
+                        <div class="progress-bar bg-{{ wellness.badge_class }}" role="progressbar" style="width: {{ wellness.score }}%;" aria-valuenow="{{ wellness.score }}" aria-valuemin="0" aria-valuemax="100"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 1. Emergency 108 Ambulance Dispatch & Critical Vitals Banner (if critical) -->
+        {% if (latest_record and latest_record.is_critical) or patient.urgency_level == 'EMERGENCY' %}
+        <div class="alert alert-danger border-2 border-danger shadow-lg rounded-4 p-4 mb-4 position-relative emergency-pulse-banner" role="alert">
+            <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="bg-danger text-white rounded-circle p-3 d-flex align-items-center justify-content-center shadow" style="width: 56px; height: 56px; min-width: 56px;">
+                        <i class="fas fa-truck-medical fs-3 fa-beat"></i>
+                    </div>
+                    <div>
+                        <span class="badge bg-danger text-white text-uppercase px-2 py-1 mb-1 font-monospace" style="letter-spacing: 1px;">
+                            <i class="fas fa-triangle-exclamation me-1"></i> EMERGENCY RED-FLAG TRIAGE
+                        </span>
+                        <h4 class="fw-bold mb-1 text-danger">CRITICAL TRIAGE PRIORITY - IMMEDIATE ATTENTION REQUIRED</h4>
+                        <div class="text-dark fw-semibold small">
+                            Patient: <span class="badge bg-dark font-monospace">{{ patient.name }} ({{ patient.patient_uid }})</span>
+                            &bull; Presenting: <span class="text-danger fw-bold">{{ patient.symptoms or 'Acute Critical Distress' }}</span>
+                            {% if latest_record and latest_record.systolic_bp %}
+                            &bull; Vitals: <span class="text-danger fw-bold">BP {{ latest_record.systolic_bp }}/{{ latest_record.diastolic_bp }} | SpO2 {{ latest_record.spo2 }}%</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="d-flex flex-wrap align-items-center gap-2">
+                    <a href="tel:108" class="btn btn-danger btn-lg px-4 py-2 rounded-pill fw-bold shadow d-flex align-items-center gap-2">
+                        <i class="fas fa-phone-volume fs-5"></i>
+                        <span>CALL 108</span>
+                    </a>
+                    <form method="POST" action="{{ url_for('features_bp.dispatch_ambulance', patient_id=patient.patient_uid) }}" class="d-inline" onsubmit="return confirm('Confirm dispatching 108 Emergency Ambulance for patient {{ patient.name }}?');">
+                        <input type="hidden" name="vitals_summary" value="Urgency: {{ patient.urgency_level }}, Symptoms: {{ patient.symptoms }}">
+                        <input type="hidden" name="chief_complaint" value="{{ patient.symptoms or (latest_record and latest_record.diagnosis) or 'Critical Camp Triage Referral' }}">
+                        <button type="submit" class="btn btn-outline-danger btn-lg px-3 py-2 rounded-pill fw-semibold shadow-sm">
+                            <i class="fas fa-paper-plane me-1"></i> Log Dispatch
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Demographic Profile Card with Photo, QR Code, and Presenting Symptoms -->
+        <div class="card border-0 shadow-sm rounded-4 mb-4 bg-white overflow-hidden hover-lift">
+            <div class="card-header bg-primary text-white py-3 px-4 d-flex justify-content-between align-items-center" style="background: linear-gradient(135deg, #1e3a8a, #2563eb);">
                 <span class="fw-bold"><i class="fa-solid fa-id-card-clip me-2"></i>Official Digital Health Pass & Demographics Profile</span>
-                <span class="badge bg-white text-primary fw-semibold">Active Enrollment</span>
+                <span class="badge bg-white text-primary fw-semibold">{{ patient.urgency_level or 'NORMAL' }} Triage</span>
             </div>
             <div class="card-body p-4">
                 <div class="row g-4 align-items-center">
@@ -73,7 +186,6 @@
                                     {% if patient.photo_filename %}
                                         <img src="{{ url_for('static', filename='uploads/' + patient.photo_filename) }}" class="rounded shadow-sm" style="width: 120px; height: 120px; object-fit: cover;">
                                     {% else %}
-                                        <!-- Default Stylized Healthcare Avatar Placeholder -->
                                         <div class="rounded shadow-sm bg-white border border-2 border-primary-subtle d-flex flex-column align-items-center justify-content-center text-primary" style="width: 120px; height: 120px;">
                                             <i class="fa-solid fa-hospital-user fs-1 text-primary"></i>
                                             <span class="badge bg-light text-secondary mt-1" style="font-size: 0.65rem;">No Photo</span>
@@ -139,11 +251,24 @@
                                 </span>
                             </div>
                             <div class="col-6 col-md-6">
-                                <label class="text-muted small fw-medium d-block">Registration Date</label>
-                                <span class="fs-6 fw-bold text-dark">
-                                    <i class="fa-regular fa-calendar-check text-success me-1"></i>{{ patient.created_at.strftime('%d %B %Y') }}
-                                </span>
+                                <label class="text-muted small fw-medium d-block">Triage Urgency Level</label>
+                                {% if patient.urgency_level == 'EMERGENCY' %}
+                                    <span class="badge bg-danger text-white pulse-emergency px-3 py-1">EMERGENCY #1</span>
+                                {% elif patient.urgency_level == 'URGENT' %}
+                                    <span class="badge bg-warning text-dark border border-warning px-3 py-1">URGENT</span>
+                                {% else %}
+                                    <span class="badge bg-success-subtle text-success border border-success-subtle px-3 py-1">NORMAL</span>
+                                {% endif %}
                             </div>
+                            
+                            <!-- Presenting Problem / Symptoms -->
+                            <div class="col-12">
+                                <label class="text-muted small fw-medium d-block">Presenting Problem / Symptoms ('Kya Problem Hai?')</label>
+                                <div class="fs-6 text-dark bg-light p-3 rounded-3 border font-monospace">
+                                    <i class="fas fa-stethoscope text-danger me-2"></i>{{ patient.symptoms or 'Routine community health checkup / No acute complaint recorded.' }}
+                                </div>
+                            </div>
+
                             <div class="col-12">
                                 <label class="text-muted small fw-medium d-block">Residential Address / Ward / Locality</label>
                                 <span class="fs-6 text-dark bg-light p-2 rounded-2 d-block border">
@@ -157,104 +282,207 @@
             </div>
         </div>
 
-        <!-- Clinical Encounter & Prescription History (Restricted to Authorized Users) -->
-        {% if current_user.is_authenticated %}
-        <div class="card border-0 shadow-sm rounded-4 bg-white mb-4">
+        <!-- 2. SYMPTOM-FIRST TABLET SCHEDULE COMPONENT -->
+        {% if (patient and patient.symptoms) or (latest_record and latest_record.prescription) or (symptom_schedule and symptom_schedule.has_prescription) %}
+        <div class="card border-0 shadow-sm rounded-4 mb-4 bg-white overflow-hidden hover-lift">
             <div class="card-header bg-white py-3 px-4 border-bottom d-flex justify-content-between align-items-center">
                 <div>
-                    <h5 class="fw-bold mb-0 text-dark">
-                        <i class="fa-solid fa-notes-medical text-primary me-2"></i>Clinical Encounter & Prescription History
-                    </h5>
-                    <small class="text-muted">Chronological consultations recorded during health camp operations</small>
+                    <h6 class="fw-bold mb-0 text-dark">
+                        <i class="fas fa-clock text-primary me-2"></i>Symptom-First Daily Medicine Dosage Timings
+                    </h6>
+                    <small class="text-muted">Targeted Schedule for: <span class="badge bg-light text-dark border">{{ patient.symptoms or latest_record.diagnosis }}</span></small>
                 </div>
-                <span class="badge bg-secondary-subtle text-secondary px-3 py-2 rounded-pill">
-                    {{ patient.health_records|length }} Total Visits
-                </span>
+                {% if whatsapp_url %}
+                <a href="{{ whatsapp_url }}" target="_blank" class="btn btn-success btn-sm rounded-pill px-3 shadow-sm fw-semibold">
+                    <i class="fab fa-whatsapp me-1"></i> Send on WhatsApp
+                </a>
+                {% endif %}
             </div>
-            <div class="card-body p-0">
-                <div class="table-responsive">
-                    <table class="table table-hover align-middle mb-0">
-                        <thead class="table-light">
-                            <tr class="small text-muted text-uppercase">
-                                <th class="ps-4">Encounter Date</th>
-                                <th>Attending Doctor</th>
-                                <th>Camp Location</th>
-                                <th>Clinical Diagnosis</th>
-                                <th>Prescription & Dosage</th>
-                                <th class="pe-4">Doctor Notes</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% if patient.health_records %}
-                                {% for rec in patient.health_records|sort(attribute='created_at', reverse=True) %}
-                                <tr>
-                                    <td class="ps-4">
-                                        <div class="fw-bold text-dark">{{ rec.created_at.strftime('%d %b %Y') }}</div>
-                                        <small class="text-muted">{{ rec.created_at.strftime('%H:%M') }}</small>
-                                    </td>
-                                    <td>
-                                        {% if rec.doctor %}
-                                            <div class="fw-semibold text-dark">{{ rec.doctor.name }}</div>
-                                            <small class="text-muted">{{ rec.doctor.specialization }}</small>
-                                        {% else %}
-                                            <span class="text-muted">Medical Officer</span>
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        {% if rec.camp %}
-                                            <div class="small fw-semibold text-dark">{{ rec.camp.title }}</div>
-                                            <small class="text-muted">{{ rec.camp.location_name }}</small>
-                                        {% else %}
-                                            <span class="text-muted small">General Camp</span>
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        <span class="badge bg-danger-subtle text-danger border border-danger-subtle px-2 py-1">
-                                            {{ rec.diagnosis }}
-                                        </span>
-                                    </td>
-                                    <td>
-                                        <div class="small text-dark font-monospace bg-light p-2 rounded border" style="white-space: pre-line;">
-                                            {{ rec.prescription or 'None specified' }}
-                                        </div>
-                                    </td>
-                                    <td class="pe-4">
-                                        <span class="text-muted small" style="white-space: pre-line;">
-                                            {{ rec.doctor_notes or '—' }}
-                                        </span>
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            {% else %}
-                                <tr>
-                                    <td colspan="6" class="text-center py-5 text-muted">
-                                        <i class="fa-solid fa-clipboard-question fs-1 d-block mb-3 text-secondary"></i>
-                                        No clinical consultation records found for this patient yet.
-                                    </td>
-                                </tr>
-                            {% endif %}
-                        </tbody>
-                    </table>
+            <div class="card-body p-4">
+                <div class="row g-3 text-center">
+                    <!-- Morning Slot -->
+                    <div class="col-12 col-md-4">
+                        <div class="p-3 rounded-3 bg-light border h-100">
+                            <div class="d-inline-flex p-2 rounded-circle bg-warning bg-opacity-10 text-warning mb-2">
+                                <i class="fas fa-sun fs-4"></i>
+                            </div>
+                            <h6 class="fw-bold text-dark mb-1">Morning / सुबह / ಬೆಳಿಗ್ಗೆ</h6>
+                            <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle mb-2">08:00 AM (नाश्ते के बाद)</span>
+                            <p class="small text-muted mb-0">
+                                {% if symptom_schedule and symptom_schedule.morning %}
+                                    {{ symptom_schedule.morning|join(', ') }}
+                                {% else %}
+                                    Take blood pressure, thyroid, and daily multivitamins as prescribed.
+                                {% endif %}
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Afternoon Slot -->
+                    <div class="col-12 col-md-4">
+                        <div class="p-3 rounded-3 bg-light border h-100">
+                            <div class="d-inline-flex p-2 rounded-circle bg-info bg-opacity-10 text-info mb-2">
+                                <i class="fas fa-cloud-sun fs-4"></i>
+                            </div>
+                            <h6 class="fw-bold text-dark mb-1">Afternoon / दोपहर / ಮಧ್ಯಾಹ್ನ</h6>
+                            <span class="badge bg-info-subtle text-info-emphasis border border-info-subtle mb-2">01:30 PM (दोपहर भोजन के बाद)</span>
+                            <p class="small text-muted mb-0">
+                                {% if symptom_schedule and symptom_schedule.afternoon %}
+                                    {{ symptom_schedule.afternoon|join(', ') }}
+                                {% else %}
+                                    Take prescribed antibiotics, digestive tablets, or antacid capsules.
+                                {% endif %}
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Night Slot -->
+                    <div class="col-12 col-md-4">
+                        <div class="p-3 rounded-3 bg-light border h-100">
+                            <div class="d-inline-flex p-2 rounded-circle bg-primary bg-opacity-10 text-primary mb-2">
+                                <i class="fas fa-moon fs-4"></i>
+                            </div>
+                            <h6 class="fw-bold text-dark mb-1">Night / रात / ರಾತ್ರಿ</h6>
+                            <span class="badge bg-primary-subtle text-primary border border-primary-subtle mb-2">08:30 PM (रात के खाने के बाद)</span>
+                            <p class="small text-muted mb-0">
+                                {% if symptom_schedule and symptom_schedule.night %}
+                                    {{ symptom_schedule.night|join(', ') }}
+                                {% else %}
+                                    Take cholesterol, night antidiabetic, and allergy relief tablets.
+                                {% endif %}
+                            </p>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
         {% else %}
-        <!-- Confidential Clinical Records Privacy Banner (Shown to Unauthenticated Scanners) -->
-        <div class="card border-0 shadow-sm rounded-4 bg-white mb-4 p-4 text-center">
-            <div class="d-inline-flex p-3 rounded-circle bg-warning bg-opacity-10 text-warning mx-auto mb-3" style="width: 60px; height: 60px; align-items: center; justify-content: center;">
-                <i class="fa-solid fa-shield-halved fs-3"></i>
+        <!-- LOCKED: Waiting for Patient Symptoms / Clinical Condition to be recorded -->
+        <div class="card border-0 shadow-sm rounded-4 mb-4 bg-white p-4 text-center hover-lift">
+            <div class="d-inline-flex p-3 rounded-circle bg-secondary bg-opacity-10 text-secondary mx-auto mb-2" style="width: 52px; height: 52px; align-items: center; justify-content: center;">
+                <i class="fas fa-lock fs-4"></i>
             </div>
-            <h5 class="fw-bold text-dark mb-1">Confidential Medical Records & Prescriptions Protected</h5>
-            <p class="text-muted small mx-auto mb-3" style="max-width: 550px;">
-                In compliance with medical data privacy regulations, detailed consultation notes, clinical diagnoses, and prescriptions are restricted to authenticated medical staff and camp officers.
+            <h6 class="fw-bold text-dark mb-1">Symptom-First Clinical Prescription Schedule</h6>
+            <p class="text-muted small mx-auto mb-0" style="max-width: 500px;">
+                Tablet suggestions and Morning/Afternoon/Night dosage schedules unlock automatically once patient symptoms ("Kya Problem Hai?") and doctor clinical evaluation are recorded.
             </p>
-            <div>
-                <a href="{{ url_for('login') }}?next={{ url_for('patient_detail', patient_id=patient.patient_uid) }}" class="btn btn-primary px-4 rounded-pill shadow-sm">
-                    <i class="fa-solid fa-user-doctor me-1"></i> Medical Staff Sign In to View Complete Records
-                </a>
-            </div>
         </div>
         {% endif %}
+
+        <!-- 3. Personalized Indian Food & Diet Recommendation Card -->
+        <div class="card border-0 shadow-sm rounded-4 mb-4 bg-white overflow-hidden hover-lift">
+            <div class="card-header bg-white py-3 px-4 border-bottom d-flex justify-content-between align-items-center">
+                <h6 class="fw-bold mb-0 text-dark">
+                    <i class="fas fa-apple-whole text-success me-2"></i>Personalized Indian Food & Diet Recommendation (आहार परामर्श)
+                </h6>
+                <span class="badge bg-success-subtle text-success border border-success-subtle px-3 py-1">
+                    Clinical Nutrition
+                </span>
+            </div>
+            <div class="card-body p-4">
+                <div class="row g-4">
+                    <div class="col-12 col-md-6">
+                        <div class="p-3 rounded-3 h-100" style="background-color: #f0fdf4; border-left: 4px solid #16a34a;">
+                            <h6 class="fw-bold text-success mb-2 d-flex align-items-center gap-2">
+                                <i class="fas fa-circle-check"></i>
+                                <span>Foods to Eat / खाने योग्य आहार</span>
+                            </h6>
+                            <ul class="mb-0 ps-3 small text-dark" style="line-height: 1.8;">
+                                {% if diet_plan and diet_plan.foods_to_eat %}
+                                    {% for item in diet_plan.foods_to_eat %}
+                                        <li>{{ item }}</li>
+                                    {% endfor %}
+                                {% else %}
+                                    <li>Seasonal green leafy vegetables (Palak, Methi, Lauki)</li>
+                                    <li>Whole grain rotis (Wheat + Chana or Jowar) & Moong dal sprouts</li>
+                                    <li>Plenty of clean boiled/filtered water throughout the day</li>
+                                {% endif %}
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <div class="p-3 rounded-3 h-100" style="background-color: #fef2f2; border-left: 4px solid #dc2626;">
+                            <h6 class="fw-bold text-danger mb-2 d-flex align-items-center gap-2">
+                                <i class="fas fa-circle-xmark"></i>
+                                <span>Foods to Avoid / परहेज योग्य आहार</span>
+                            </h6>
+                            <ul class="mb-0 ps-3 small text-dark" style="line-height: 1.8;">
+                                {% if diet_plan and diet_plan.foods_to_avoid %}
+                                    {% for item in diet_plan.foods_to_avoid %}
+                                        <li>{{ item }}</li>
+                                    {% endfor %}
+                                {% else %}
+                                    <li>Pickles (Aachar), Papad, and extra table salt</li>
+                                    <li>Deep fried roadside snacks (Samosa, Pakoda, Puri)</li>
+                                    <li>Excessive refined white sugar and maida confectioneries</li>
+                                {% endif %}
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                {% if diet_plan and diet_plan.lifestyle_tip %}
+                <div class="mt-3 p-2 px-3 rounded-3 bg-light border d-flex align-items-center gap-2 small text-muted">
+                    <i class="fas fa-lightbulb text-warning fs-5"></i>
+                    <div><strong>Physician Lifestyle Tip:</strong> {{ diet_plan.lifestyle_tip }}</div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- 4. Previous Camp Visits History Timeline -->
+        <div class="card border-0 shadow-sm rounded-4 mb-4 bg-white overflow-hidden hover-lift">
+            <div class="card-header bg-white py-3 px-4 border-bottom d-flex justify-content-between align-items-center">
+                <h6 class="fw-bold mb-0 text-dark">
+                    <i class="fas fa-timeline text-primary me-2"></i>Previous Camp Visits History (पूर्व स्वास्थ्य जांच इतिहास)
+                </h6>
+                <span class="badge bg-primary-subtle text-primary border border-primary-subtle">
+                    {{ patient.health_records|length if patient else 0 }} Past Visits
+                </span>
+            </div>
+            <div class="card-body p-4">
+                {% if patient and patient.health_records %}
+                <div class="timeline position-relative ps-4" style="border-left: 2px solid #e2e8f0;">
+                    {% for r in patient.health_records|sort(attribute='created_at', reverse=True) %}
+                    <div class="mb-4 position-relative">
+                        <div class="position-absolute rounded-circle {% if r.is_critical %}bg-danger{% else %}bg-primary{% endif %}" style="width: 12px; height: 12px; left: -25px; top: 4px; border: 2px solid #ffffff;"></div>
+
+                        <div class="d-flex flex-wrap justify-content-between align-items-center mb-1">
+                            <span class="fw-bold text-dark fs-6">{{ r.camp.title if r.camp else 'Outreach Health Camp' }}</span>
+                            <span class="badge bg-light text-muted border font-monospace">{{ r.created_at.strftime('%d %B %Y') }}</span>
+                        </div>
+                        <div class="small text-muted mb-2">
+                            <i class="fas fa-user-doctor text-success me-1"></i>Dr. {{ r.doctor.name if r.doctor else 'Medical Officer' }} ({{ r.doctor.specialization if r.doctor else 'General' }})
+                            &bull; <i class="fas fa-location-dot text-danger me-1"></i>{{ r.camp.location_name if r.camp else 'Venue' }}
+                            {% if r.is_critical %}
+                            <span class="badge bg-danger ms-2">Critical Triage</span>
+                            {% endif %}
+                        </div>
+                        <div class="p-3 bg-light rounded-3 border small">
+                            <div class="mb-1"><strong>Diagnosis:</strong> <span class="text-danger fw-semibold">{{ r.diagnosis }}</span></div>
+                            {% if r.systolic_bp or r.spo2 or r.blood_sugar %}
+                            <div class="mb-1 text-muted">
+                                <strong>Vitals:</strong>
+                                {% if r.systolic_bp and r.diastolic_bp %}BP: {{ r.systolic_bp }}/{{ r.diastolic_bp }} mmHg | {% endif %}
+                                {% if r.spo2 %}SpO2: {{ r.spo2 }}% | {% endif %}
+                                {% if r.blood_sugar %}RBS: {{ r.blood_sugar }} mg/dL{% endif %}
+                            </div>
+                            {% endif %}
+                            <div><strong>Prescription:</strong> <span class="font-monospace text-dark">{{ r.prescription or 'No medicines recorded' }}</span></div>
+                            {% if r.doctor_notes %}
+                            <div class="mt-1 text-muted"><strong>Advice:</strong> {{ r.doctor_notes }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="text-center py-4 text-muted">
+                    <i class="fas fa-notes-medical fs-1 d-block mb-2 text-secondary"></i>
+                    <p class="mb-0">This is the beneficiary's first recorded health camp visit.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
 
     </div>
 </div>

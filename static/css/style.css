@@ -90,3 +90,120 @@ body {
     border-radius: 16px;
     box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2);
 }
+
+/* ========================================================================== */
+/* V3 GAMIFIED HEALTHCARE & MODERN UI STYLES                                  */
+/* ========================================================================== */
+
+/* Smooth Card Hover Lift Animation */
+.hover-lift {
+    transition: transform 0.25s cubic-bezier(0.165, 0.84, 0.44, 1), box-shadow 0.25s cubic-bezier(0.165, 0.84, 0.44, 1) !important;
+}
+
+.hover-lift:hover {
+    transform: translateY(-4px) !important;
+    box-shadow: 0 12px 24px -4px rgba(15, 23, 42, 0.12) !important;
+}
+
+/* Pulsing Emergency Red-Flag Animation */
+@keyframes pulseEmergencyGlow {
+    0% {
+        box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.7);
+    }
+    70% {
+        box-shadow: 0 0 0 10px rgba(220, 38, 38, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(220, 38, 38, 0);
+    }
+}
+
+.pulse-emergency {
+    animation: pulseEmergencyGlow 1.8s infinite;
+}
+
+/* 4-Step Patient Journey Stepper */
+.journey-stepper {
+    display: flex;
+    justify-content: space-between;
+    position: relative;
+    margin: 20px 0;
+}
+
+.journey-stepper::before {
+    content: '';
+    position: absolute;
+    top: 24px;
+    left: 40px;
+    right: 40px;
+    height: 4px;
+    background-color: #e2e8f0;
+    z-index: 1;
+}
+
+.stepper-item {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex: 1;
+}
+
+.stepper-circle {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background-color: #ffffff;
+    border: 3px solid #cbd5e1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+    color: #64748b;
+    transition: all 0.3s ease;
+}
+
+.stepper-item.completed .stepper-circle {
+    background-color: #10b981;
+    border-color: #10b981;
+    color: #ffffff;
+    box-shadow: 0 4px 10px rgba(16, 185, 129, 0.3);
+}
+
+.stepper-item.active .stepper-circle {
+    background-color: #3b82f6;
+    border-color: #3b82f6;
+    color: #ffffff;
+    box-shadow: 0 0 0 6px rgba(59, 130, 246, 0.2);
+    animation: pulseActiveStep 2s infinite;
+}
+
+@keyframes pulseActiveStep {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.08); }
+    100% { transform: scale(1); }
+}
+
+.stepper-title {
+    font-size: 0.85rem;
+    font-weight: 700;
+    margin-top: 8px;
+    color: #1e293b;
+    text-align: center;
+}
+
+.stepper-sub {
+    font-size: 0.72rem;
+    color: #64748b;
+    text-align: center;
+}
+
+@media (max-width: 576px) {
+    .journey-stepper::before {
+        display: none;
+    }
+    .stepper-item {
+        margin-bottom: 12px;
+    }
+}

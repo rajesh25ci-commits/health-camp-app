@@ -1,0 +1,237 @@
+<!-- ======================================================================= -->
+<!-- templates_v3_snippet.html - V3 Enhanced Reusable UI Components           -->
+<!-- ======================================================================= -->
+
+<!-- 1. GAMIFIED HEALTH CAMP IMPACT SCORE & XP PROGRESS BAR CARD -->
+<!-- Insert into templates/dashboard.html above or below performance metrics -->
+<div class="card border-0 shadow-sm rounded-4 mb-4 bg-white overflow-hidden gamified-card">
+    <div class="card-body p-4 p-md-4" style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color: #ffffff;">
+        <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-4">
+            
+            <!-- Level & Title -->
+            <div class="d-flex align-items-center gap-3">
+                <div class="rounded-circle p-3 d-flex align-items-center justify-content-center shadow-lg position-relative" style="width: 68px; height: 68px; min-width: 68px; background: linear-gradient(135deg, #3b82f6, #1d4ed8); border: 3px solid rgba(255,255,255,0.2);">
+                    <i class="fas {{ gamification.level_icon if gamification else 'fa-award' }} fs-2 text-white"></i>
+                    <span class="position-absolute bottom-0 end-0 badge rounded-pill bg-warning text-dark border border-white font-monospace" style="font-size: 0.7rem;">
+                        LVL {{ gamification.level if gamification else '1' }}
+                    </span>
+                </div>
+                <div>
+                    <div class="d-flex align-items-center gap-2 mb-1">
+                        <span class="badge bg-{{ gamification.level_badge_color if gamification else 'primary' }} text-white text-uppercase px-3 py-1 font-monospace" style="font-size: 0.72rem; letter-spacing: 0.5px;">
+                            CAMP IMPACT RANK
+                        </span>
+                        <span class="text-white-50 small">&bull; {{ gamification.total_xp if gamification else '500' }} Total XP</span>
+                    </div>
+                    <h4 class="fw-bold mb-0 text-white tracking-tight">
+                        {{ gamification.level_title if gamification else 'Community Health Scout (स्वास्थ्य प्रहरी)' }}
+                    </h4>
+                    <small class="text-white-50">Community Health Initiatives &bull; Gamified Volunteer & Clinical Impact</small>
+                </div>
+            </div>
+
+            <!-- XP Progress Bar to Next Level -->
+            <div class="flex-grow-1" style="max-width: 450px;">
+                <div class="d-flex justify-content-between align-items-center mb-1 small">
+                    <span class="text-white-50">Level {{ gamification.level if gamification else '1' }} Progress</span>
+                    <span class="fw-bold text-warning font-monospace">{{ gamification.xp_in_current_level if gamification else '250' }} / 500 XP ({{ gamification.progress_percent if gamification else '50' }}%)</span>
+                </div>
+                <div class="progress rounded-pill bg-dark bg-opacity-50 border border-white border-opacity-10" style="height: 12px;">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated bg-warning" role="progressbar" style="width: {{ gamification.progress_percent if gamification else '50' }}%;" aria-valuenow="{{ gamification.progress_percent if gamification else '50' }}" aria-valuemin="0" aria-valuemax="100"></div>
+                </div>
+                <small class="text-white-50 mt-1 d-block" style="font-size: 0.72rem;">
+                    <i class="fas fa-sparkles text-warning me-1"></i>Earn <strong>{{ gamification.xp_to_next_level if gamification else '250' }} more XP</strong> to reach Level {{ (gamification.level + 1) if gamification else '2' }}!
+                </small>
+            </div>
+
+        </div>
+
+        <!-- Impact Sub-Counters Row -->
+        <div class="row row-cols-2 row-cols-md-4 g-3 mt-3 pt-3 border-top border-white border-opacity-10">
+            <div class="col">
+                <div class="p-2 rounded-3 bg-white bg-opacity-5 border border-white border-opacity-10 text-center">
+                    <span class="text-white-50 d-block small" style="font-size: 0.72rem;">Beneficiaries Enrolled</span>
+                    <span class="fs-5 fw-bold text-white font-monospace">{{ gamification.total_beneficiaries if gamification else total_patients }}</span>
+                </div>
+            </div>
+            <div class="col">
+                <div class="p-2 rounded-3 bg-white bg-opacity-5 border border-white border-opacity-10 text-center">
+                    <span class="text-white-50 d-block small" style="font-size: 0.72rem;">Critical Triage Interventions</span>
+                    <span class="fs-5 fw-bold text-danger font-monospace">{{ gamification.critical_saves if gamification else 0 }}</span>
+                </div>
+            </div>
+            <div class="col">
+                <div class="p-2 rounded-3 bg-white bg-opacity-5 border border-white border-opacity-10 text-center">
+                    <span class="text-white-50 d-block small" style="font-size: 0.72rem;">Clinical Prescriptions</span>
+                    <span class="fs-5 fw-bold text-success font-monospace">{{ gamification.total_records if gamification else 0 }}</span>
+                </div>
+            </div>
+            <div class="col">
+                <div class="p-2 rounded-3 bg-white bg-opacity-5 border border-white border-opacity-10 text-center">
+                    <span class="text-white-50 d-block small" style="font-size: 0.72rem;">Volunteer Medical Hours</span>
+                    <span class="fs-5 fw-bold text-info font-monospace">{{ gamification.volunteer_hours if gamification else 16 }}h</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Impact Badges Row -->
+        {% if gamification and gamification.badges %}
+        <div class="d-flex flex-wrap align-items-center gap-2 mt-3 pt-2">
+            <span class="text-white-50 small me-1"><i class="fas fa-medal text-warning me-1"></i>Earned Badges:</span>
+            {% for b in gamification.badges %}
+            <span class="badge rounded-pill bg-{{ b.color }} text-white px-3 py-2 shadow-sm d-inline-flex align-items-center gap-1" title="{{ b.desc }}">
+                <i class="fas {{ b.icon }} me-1"></i>{{ b.name }}
+            </span>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+    </div>
+</div>
+
+
+<!-- 2. REGISTRATION SYMPTOMS ('KYA HUA HAI?') & URGENCY STATUS FORM COMPONENT -->
+<!-- Use inside templates/register.html and registration modals -->
+<div class="row g-3">
+    <!-- Chief Complaint / Symptoms Input -->
+    <div class="col-12">
+        <label class="form-label fw-semibold text-dark">
+            <i class="fas fa-notes-medical text-primary me-1"></i>
+            Symptoms & Chief Complaint / क्या समस्या है? / ರೋಗಲಕ್ಷಣಗಳು <span class="text-danger">*</span>
+        </label>
+        <textarea class="form-control" name="symptoms" id="symptomsInput" rows="2" placeholder="Describe symptoms e.g. High fever for 2 days, chest tightness, headache, or routine health checkup..." required></textarea>
+        <!-- Quick Symptom Tags -->
+        <div class="mt-2 d-flex flex-wrap gap-1">
+            <span class="text-muted small me-1">Quick Select:</span>
+            <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2 rounded-pill small" onclick="appendSymptom('Fever & body ache')">🌡️ Fever & Body Ache</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2 rounded-pill small" onclick="appendSymptom('Severe headache')">🤕 Severe Headache</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2 rounded-pill small" onclick="appendSymptom('Cough & cold with throat pain')">☕ Cough & Cold</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2 rounded-pill small" onclick="appendSymptom('High BP & dizziness')">❤️ High BP & Dizziness</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2 rounded-pill small" onclick="appendSymptom('Acidity & stomach pain')">🌿 Acidity / Gas</button>
+            <button type="button" class="btn btn-outline-danger btn-sm py-0 px-2 rounded-pill small" onclick="appendSymptom('Chest pain & breathlessness')">🚨 Chest Pain (Emergency)</button>
+        </div>
+    </div>
+
+    <!-- Urgency Level Selection -->
+    <div class="col-12">
+        <label class="form-label fw-semibold text-dark">
+            <i class="fas fa-triangle-exclamation text-warning me-1"></i>
+            Triage Urgency Priority / तात्कालिकता स्तर
+        </label>
+        <div class="row g-2">
+            <div class="col-4">
+                <input type="radio" class="btn-check" name="urgency_level" id="urgencyNormal" value="NORMAL" checked>
+                <label class="btn btn-outline-success w-100 py-2 rounded-3 text-start small" for="urgencyNormal">
+                    <span class="fw-bold d-block"><i class="fas fa-circle-check me-1"></i> NORMAL</span>
+                    <span class="text-muted" style="font-size: 0.72rem;">Routine consultation</span>
+                </label>
+            </div>
+            <div class="col-4">
+                <input type="radio" class="btn-check" name="urgency_level" id="urgencyUrgent" value="URGENT">
+                <label class="btn btn-outline-warning w-100 py-2 rounded-3 text-start small" for="urgencyUrgent">
+                    <span class="fw-bold d-block text-dark"><i class="fas fa-bell me-1"></i> URGENT</span>
+                    <span class="text-muted" style="font-size: 0.72rem;">High priority queue</span>
+                </label>
+            </div>
+            <div class="col-4">
+                <input type="radio" class="btn-check" name="urgency_level" id="urgencyEmergency" value="EMERGENCY">
+                <label class="btn btn-outline-danger w-100 py-2 rounded-3 text-start small" for="urgencyEmergency">
+                    <span class="fw-bold d-block"><i class="fas fa-truck-medical me-1"></i> EMERGENCY</span>
+                    <span class="text-muted" style="font-size: 0.72rem;">108 / Immediate triage</span>
+                </label>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<!-- 3. SYMPTOM-FIRST TABLET SCHEDULE COMPONENT -->
+<!-- In patient_detail.html & patient_card.html -->
+{% if (patient and patient.symptoms) or (latest_record and latest_record.prescription) or (symptom_schedule and symptom_schedule.has_prescription) %}
+<!-- UNLOCKED: Symptom-Based Daily Dosage Schedule -->
+<div class="card border-0 shadow-sm rounded-4 mb-4 bg-white overflow-hidden">
+    <div class="card-header bg-white py-3 px-4 border-bottom d-flex justify-content-between align-items-center">
+        <div>
+            <h6 class="fw-bold mb-0 text-dark">
+                <i class="fas fa-clock text-primary me-2"></i>Symptom-First Daily Medicine Dosage Timings
+            </h6>
+            {% if patient and patient.symptoms %}
+            <small class="text-muted">Prescribed for Symptoms: <span class="badge bg-light text-dark border">{{ patient.symptoms }}</span></small>
+            {% endif %}
+        </div>
+        {% if whatsapp_url %}
+        <a href="{{ whatsapp_url }}" target="_blank" class="btn btn-success btn-sm rounded-pill px-3 shadow-sm fw-semibold">
+            <i class="fab fa-whatsapp me-1"></i> Send on WhatsApp
+        </a>
+        {% endif %}
+    </div>
+    <div class="card-body p-4">
+        <div class="row g-3 text-center">
+            <!-- Morning Slot -->
+            <div class="col-12 col-md-4">
+                <div class="p-3 rounded-3 bg-light border h-100">
+                    <div class="d-inline-flex p-2 rounded-circle bg-warning bg-opacity-10 text-warning mb-2">
+                        <i class="fas fa-sun fs-4"></i>
+                    </div>
+                    <h6 class="fw-bold text-dark mb-1">Morning / सुबह / ಬೆಳಿಗ್ಗೆ</h6>
+                    <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle mb-2">08:00 AM (नाश्ते के बाद)</span>
+                    <p class="small text-muted mb-0">
+                        {% if symptom_schedule and symptom_schedule.morning %}
+                            {{ symptom_schedule.morning|join(', ') }}
+                        {% else %}
+                            Take blood pressure, thyroid, and daily multivitamins as prescribed.
+                        {% endif %}
+                    </p>
+                </div>
+            </div>
+
+            <!-- Afternoon Slot -->
+            <div class="col-12 col-md-4">
+                <div class="p-3 rounded-3 bg-light border h-100">
+                    <div class="d-inline-flex p-2 rounded-circle bg-info bg-opacity-10 text-info mb-2">
+                        <i class="fas fa-cloud-sun fs-4"></i>
+                    </div>
+                    <h6 class="fw-bold text-dark mb-1">Afternoon / दोपहर / ಮಧ್ಯಾಹ್ನ</h6>
+                    <span class="badge bg-info-subtle text-info-emphasis border border-info-subtle mb-2">01:30 PM (दोपहर भोजन के बाद)</span>
+                    <p class="small text-muted mb-0">
+                        {% if symptom_schedule and symptom_schedule.afternoon %}
+                            {{ symptom_schedule.afternoon|join(', ') }}
+                        {% else %}
+                            Take prescribed antibiotics, digestive tablets, or antacid capsules.
+                        {% endif %}
+                    </p>
+                </div>
+            </div>
+
+            <!-- Night Slot -->
+            <div class="col-12 col-md-4">
+                <div class="p-3 rounded-3 bg-light border h-100">
+                    <div class="d-inline-flex p-2 rounded-circle bg-primary bg-opacity-10 text-primary mb-2">
+                        <i class="fas fa-moon fs-4"></i>
+                    </div>
+                    <h6 class="fw-bold text-dark mb-1">Night / रात / ರಾತ್ರಿ</h6>
+                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle mb-2">08:30 PM (रात के खाने के बाद)</span>
+                    <p class="small text-muted mb-0">
+                        {% if symptom_schedule and symptom_schedule.night %}
+                            {{ symptom_schedule.night|join(', ') }}
+                        {% else %}
+                            Take cholesterol, night antidiabetic, and allergy relief tablets.
+                        {% endif %}
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% else %}
+<!-- LOCKED: Waiting for Patient Symptoms / Clinical Condition to be recorded -->
+<div class="card border-0 shadow-sm rounded-4 mb-4 bg-white p-4 text-center">
+    <div class="d-inline-flex p-3 rounded-circle bg-secondary bg-opacity-10 text-secondary mx-auto mb-2" style="width: 52px; height: 52px; align-items: center; justify-content: center;">
+        <i class="fas fa-lock fs-4"></i>
+    </div>
+    <h6 class="fw-bold text-dark mb-1">Symptom-First Clinical Prescription Schedule</h6>
+    <p class="text-muted small mx-auto mb-0" style="max-width: 500px;">
+        Tablet suggestions and Morning/Afternoon/Night dosage schedules unlock automatically once patient symptoms ("Kya Hua Hai?") and doctor clinical evaluation are recorded.
+    </p>
+</div>
+{% endif %}

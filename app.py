@@ -43,6 +43,26 @@ from utils import (
     ensure_default_qr,
     ensure_default_avatar
 )
+from upgraded_features_v3 import (
+    features_v3_bp,
+    universal_health_chatbot,
+    get_symptom_based_prescription,
+    compute_camp_gamification,
+    calculate_patient_wellness_score,
+    get_patient_journey_steps
+)
+from sqlalchemy import case
+from upgraded_features import (
+    features_bp,
+    MedicineInventory,
+    MedicineReminder,
+    AmbulanceDispatchLog,
+    evaluate_vitals_triage,
+    build_medicine_schedule_sms,
+    recommend_diet_plan,
+    deduct_medicine_inventory,
+    init_medicine_inventory_seed
+)
 
 
 def create_app(config_class=Config) -> Flask:
@@ -58,6 +78,17 @@ def create_app(config_class=Config) -> Flask:
 
     # 2. Initialize database
     db.init_app(app)
+
+    # 2.1 Register Upgraded Features Blueprint
+    app.register_blueprint(features_bp)
+    app.register_blueprint(features_v3_bp)
+
+    with app.app_context():
+        try:
+            db.create_all()
+            init_medicine_inventory_seed(app)
+        except Exception as e:
+            print(f"[WARN] Database initialization notice: {e}")
 
     # 3. Initialize Flask-Login
     login_manager = LoginManager()
@@ -137,7 +168,19 @@ def create_app(config_class=Config) -> Flask:
         total_camps = Camp.query.count()
         total_appointments = Appointment.query.count()
 
-        recent_patients = Patient.query.order_by(Patient.created_at.desc()).limit(5).all()
+        all_camps = Camp.query.all()
+        all_patients = Patient.query.all()
+        all_records = HealthRecord.query.all()
+        all_doctors = Doctor.query.all()
+        all_dispatches = AmbulanceDispatchLog.query.all()
+        gamification = compute_camp_gamification(all_camps, all_patients, all_records, all_doctors, all_dispatches)
+
+        urgency_case = case(
+            (Patient.urgency_level == 'EMERGENCY', 1),
+            (Patient.urgency_level == 'URGENT', 2),
+            else_=3
+        )
+        recent_patients = Patient.query.order_by(urgency_case, Patient.created_at.desc()).limit(8).all()
         upcoming_camps = Camp.query.filter(Camp.status == 'Upcoming').order_by(Camp.date.asc()).limit(5).all()
         low_stock_medicines = Medicine.query.filter(Medicine.quantity <= Medicine.reorder_level).all()
 
@@ -167,7 +210,8 @@ def create_app(config_class=Config) -> Flask:
             age_labels=age_labels,
             age_data=age_data,
             med_labels=med_labels,
-            med_quantities=med_quantities
+            med_quantities=med_quantities,
+            gamification=gamification
         )
 
     # ==========================================
@@ -194,7 +238,12 @@ def create_app(config_class=Config) -> Flask:
         if gender_filter:
             query = query.filter(Patient.gender == gender_filter)
 
-        patients_list = query.order_by(Patient.created_at.desc()).all()
+        urgency_case = case(
+            (Patient.urgency_level == 'EMERGENCY', 1),
+            (Patient.urgency_level == 'URGENT', 2),
+            else_=3
+        )
+        patients_list = query.order_by(urgency_case, Patient.created_at.desc()).all()
         return render_template('patients.html', patients=patients_list, search=search, gender_filter=gender_filter)
 
     @app.route('/patient/add', methods=['POST'])
@@ -209,6 +258,10 @@ def create_app(config_class=Config) -> Flask:
         gender = request.form.get('gender', '').strip()
         phone = request.form.get('phone', '').strip()
         address = request.form.get('address', '').strip()
+        symptoms = request.form.get('symptoms', '').strip()
+        urgency_level = request.form.get('urgency_level', 'NORMAL').strip().upper()
+        if urgency_level not in ['NORMAL', 'URGENT', 'EMERGENCY']:
+            urgency_level = 'NORMAL'
 
         if not name or not age_val or not gender:
             flash('Please fill in all required fields (Name, Age, Gender).', 'danger')
@@ -265,12 +318,19 @@ def create_app(config_class=Config) -> Flask:
             phone=phone if phone else None,
             address=address if address else None,
             photo_filename=photo_filename,
-            qr_code_path=qr_code_rel_path
+            qr_code_path=qr_code_rel_path,
+            symptoms=symptoms if symptoms else None,
+            urgency_level=urgency_level
         )
         db.session.add(new_patient)
         db.session.commit()
 
-        flash(f'Patient {new_patient.name} successfully registered with UID {patient_uid}. QR Code generated with profile link!', 'success')
+        if urgency_level == 'EMERGENCY':
+            flash(f'🚨 EMERGENCY: Patient {name} ({patient_uid}) registered with critical symptoms. Auto-prioritized to #1 in Doctor Queue!', 'danger')
+        elif urgency_level == 'URGENT':
+            flash(f'⚠️ URGENT: Patient {name} ({patient_uid}) registered with high-priority triage status.', 'warning')
+        else:
+            flash(f'Patient {new_patient.name} successfully registered with UID {patient_uid}. QR Code generated with profile link!', 'success')
         return redirect(url_for('patient_detail', patient_id=new_patient.patient_uid))
 
     @app.route('/patient/<patient_id>/update-photo', methods=['POST'])
@@ -363,12 +423,32 @@ def create_app(config_class=Config) -> Flask:
         # Full verification URL
         verification_url = url_for('patient_card', patient_id=patient.patient_uid, _external=True)
 
+        # Build personalized diet and medicine timing schedule
+        prescription_text = getattr(latest_record, 'prescription', '') or ''
+        diag_text = getattr(latest_record, 'diagnosis', '') or ''
+        vitals_text = f"BP: {getattr(latest_record, 'systolic_bp', '')}/{getattr(latest_record, 'diastolic_bp', '')}, SpO2: {getattr(latest_record, 'spo2', '')}%" if latest_record and getattr(latest_record, 'systolic_bp', None) else ""
+
+        diet_plan = recommend_diet_plan(diag_text, vitals_text, systolic=getattr(latest_record, 'systolic_bp', None), rbs=getattr(latest_record, 'blood_sugar', None))
+        med_schedule = build_medicine_schedule_sms(patient, prescription_text, save_to_db=False)
+        ambulance_log = AmbulanceDispatchLog.query.filter_by(patient_id=patient.id).order_by(AmbulanceDispatchLog.dispatched_at.desc()).first()
+
+        wellness = calculate_patient_wellness_score(patient, latest_record)
+        journey_steps = get_patient_journey_steps(patient, latest_record)
+        symptom_schedule = get_symptom_based_prescription(getattr(patient, 'symptoms', ''), patient.age, getattr(patient, 'urgency_level', 'NORMAL'))
+
         return render_template(
             'patient_card.html',
             patient=patient,
             latest_record=latest_record,
             photo_url=photo_url,
-            verification_url=verification_url
+            verification_url=verification_url,
+            diet_plan=diet_plan,
+            med_schedule=med_schedule,
+            whatsapp_url=med_schedule['whatsapp_url'],
+            ambulance_log=ambulance_log,
+            wellness=wellness,
+            journey_steps=journey_steps,
+            symptom_schedule=symptom_schedule
         )
 
     @app.route('/patient/<patient_id>')
@@ -395,7 +475,32 @@ def create_app(config_class=Config) -> Flask:
             return render_template('patient_not_found.html', patient_id=target_id), 404
 
         profile_url = url_for('patient_detail', patient_id=patient.patient_uid, _external=True)
-        return render_template('patient_detail.html', patient=patient, profile_url=profile_url)
+        latest_record = HealthRecord.query.filter_by(patient_id=patient.id).order_by(HealthRecord.created_at.desc()).first()
+        prescription_text = getattr(latest_record, 'prescription', '') or ''
+        diag_text = getattr(latest_record, 'diagnosis', '') or ''
+        vitals_text = f"BP: {getattr(latest_record, 'systolic_bp', '')}/{getattr(latest_record, 'diastolic_bp', '')}, SpO2: {getattr(latest_record, 'spo2', '')}%" if latest_record and getattr(latest_record, 'systolic_bp', None) else ""
+
+        diet_plan = recommend_diet_plan(diag_text, vitals_text, systolic=getattr(latest_record, 'systolic_bp', None), rbs=getattr(latest_record, 'blood_sugar', None))
+        med_schedule = build_medicine_schedule_sms(patient, prescription_text, save_to_db=False)
+        ambulance_log = AmbulanceDispatchLog.query.filter_by(patient_id=patient.id).order_by(AmbulanceDispatchLog.dispatched_at.desc()).first()
+
+        wellness = calculate_patient_wellness_score(patient, latest_record)
+        journey_steps = get_patient_journey_steps(patient, latest_record)
+        symptom_schedule = get_symptom_based_prescription(getattr(patient, 'symptoms', ''), patient.age, getattr(patient, 'urgency_level', 'NORMAL'))
+
+        return render_template(
+            'patient_detail.html',
+            patient=patient,
+            profile_url=profile_url,
+            latest_record=latest_record,
+            diet_plan=diet_plan,
+            med_schedule=med_schedule,
+            whatsapp_url=med_schedule['whatsapp_url'],
+            ambulance_log=ambulance_log,
+            wellness=wellness,
+            journey_steps=journey_steps,
+            symptom_schedule=symptom_schedule
+        )
 
     @app.route('/patient/<patient_id>/pdf')
     @app.route('/patient/<int:id>/pdf')
@@ -593,8 +698,18 @@ def create_app(config_class=Config) -> Flask:
     @login_required
     def appointments():
         """Doctor consultation queue and appointment scheduling."""
-        appointments_list = Appointment.query.order_by(Appointment.date.desc(), Appointment.id.desc()).all()
-        patients_list = Patient.query.order_by(Patient.name.asc()).all()
+        urgency_case = case(
+            (Patient.urgency_level == 'EMERGENCY', 1),
+            (Patient.urgency_level == 'URGENT', 2),
+            else_=3
+        )
+        appointments_list = Appointment.query.outerjoin(Patient).order_by(
+            urgency_case,
+            Appointment.date.desc(),
+            Appointment.id.desc()
+        ).all()
+        urgency_case = case((Patient.urgency_level == 'EMERGENCY', 1), (Patient.urgency_level == 'URGENT', 2), else_=3)
+        patients_list = Patient.query.order_by(urgency_case.asc(), Patient.name.asc()).all()
         doctors_list = Doctor.query.order_by(Doctor.name.asc()).all()
         camps_list = Camp.query.order_by(Camp.date.asc()).all()
 
@@ -663,13 +778,18 @@ def create_app(config_class=Config) -> Flask:
     @app.route('/records')
     @login_required
     def records():
-        """Clinical records directory and consultation history."""
-        records_list = HealthRecord.query.order_by(HealthRecord.created_at.desc()).all()
-        patients_list = Patient.query.order_by(Patient.name.asc()).all()
+        """Clinical records directory and consultation history with triage priority."""
+        # Prioritize Red-Flag Critical patients at the top of the queue
+        records_list = HealthRecord.query.order_by(HealthRecord.is_critical.desc(), HealthRecord.created_at.desc()).all()
+        urgency_case = case((Patient.urgency_level == 'EMERGENCY', 1), (Patient.urgency_level == 'URGENT', 2), else_=3)
+        patients_list = Patient.query.order_by(urgency_case.asc(), Patient.name.asc()).all()
         doctors_list = Doctor.query.order_by(Doctor.name.asc()).all()
         camps_list = Camp.query.order_by(Camp.date.asc()).all()
+        inventory_items = MedicineInventory.query.order_by(MedicineInventory.name.asc()).all()
+        ambulance_logs = AmbulanceDispatchLog.query.order_by(AmbulanceDispatchLog.dispatched_at.desc()).limit(10).all()
 
         selected_patient_id = request.args.get('patient_id', type=int)
+        critical_records = [r for r in records_list if getattr(r, 'is_critical', False)]
 
         return render_template(
             'records.html',
@@ -677,13 +797,16 @@ def create_app(config_class=Config) -> Flask:
             patients=patients_list,
             doctors=doctors_list,
             camps=camps_list,
+            inventory_items=inventory_items,
+            ambulance_logs=ambulance_logs,
+            critical_records=critical_records,
             selected_patient_id=selected_patient_id
         )
 
     @app.route('/record/add', methods=['POST'])
     @login_required
     def record_add():
-        """Record a completed medical consultation, diagnosis, and prescription."""
+        """Record a completed medical consultation, diagnosis, vitals triage, and prescription."""
         patient_id = request.form.get('patient_id', type=int)
         doctor_id = request.form.get('doctor_id', type=int)
         camp_id = request.form.get('camp_id', type=int)
@@ -691,9 +814,21 @@ def create_app(config_class=Config) -> Flask:
         prescription = request.form.get('prescription', '').strip()
         doctor_notes = request.form.get('doctor_notes', '').strip()
 
+        # Vitals extraction
+        systolic_bp = request.form.get('systolic_bp', type=int)
+        diastolic_bp = request.form.get('diastolic_bp', type=int)
+        blood_sugar = request.form.get('blood_sugar', type=float)
+        spo2 = request.form.get('spo2', type=float)
+        pulse_rate = request.form.get('pulse_rate', type=int)
+
         if not patient_id or not doctor_id or not camp_id or not diagnosis:
             flash('Please select patient, doctor, camp, and provide a diagnosis.', 'danger')
             return redirect(url_for('records'))
+
+        patient = db.session.get(Patient, patient_id)
+
+        # 1. Critical Vitals Triage Assessment
+        triage_res = evaluate_vitals_triage(systolic_bp, diastolic_bp, blood_sugar, spo2, pulse_rate)
 
         new_record = HealthRecord(
             patient_id=patient_id,
@@ -701,13 +836,46 @@ def create_app(config_class=Config) -> Flask:
             camp_id=camp_id,
             diagnosis=diagnosis,
             prescription=prescription if prescription else None,
-            doctor_notes=doctor_notes if doctor_notes else None
+            doctor_notes=doctor_notes if doctor_notes else None,
+            systolic_bp=systolic_bp,
+            diastolic_bp=diastolic_bp,
+            blood_sugar=blood_sugar,
+            spo2=spo2,
+            pulse_rate=pulse_rate,
+            is_critical=triage_res['is_critical'],
+            triage_priority=triage_res['priority']
         )
         db.session.add(new_record)
         db.session.commit()
 
-        flash('Clinical consultation record saved successfully.', 'success')
-        return redirect(url_for('records'))
+        # 2. Live Inventory Stock Deduction
+        inv_results = []
+        if prescription:
+            inv_results = deduct_medicine_inventory(prescription)
+
+        # 3. Automated Medicine Timing SMS & Reminders
+        whatsapp_url = None
+        if prescription and patient:
+            reminder_res = build_medicine_schedule_sms(patient, prescription, save_to_db=True)
+            whatsapp_url = reminder_res['whatsapp_url']
+
+        # 4. Generate Personalized Indian Diet Recommendation
+        diet_plan = recommend_diet_plan(diagnosis, triage_res['summary'], systolic=systolic_bp, rbs=blood_sugar)
+
+        # Notification & Alert Banners
+        if triage_res['is_critical']:
+            flash(
+                f"🚨 RED-FLAG EMERGENCY: Patient {patient.name} has CRITICAL vitals ({triage_res['reasons_text']})! CALL AMBULANCE (108) or log referral immediately.",
+                'danger'
+            )
+        else:
+            flash(f"Clinical consultation record saved successfully for {patient.name}.", 'success')
+
+        for item in inv_results:
+            if item.get('warning'):
+                flash(f"⚠️ Inventory Notice: {item['warning']}", 'warning')
+
+        return redirect(url_for('records', patient_id=patient_id))
 
     # ==========================================
     # Pharmacy Inventory & Stock Management

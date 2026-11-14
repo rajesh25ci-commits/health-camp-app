@@ -1,0 +1,296 @@
+<!-- ======================================================================= -->
+<!-- templates_snippet.html - Reference Reusable UI Components for Health Camp -->
+<!-- ======================================================================= -->
+
+<!-- 1. EMERGENCY 108 AMBULANCE DISPATCH & CRITICAL VITALS BANNER -->
+<!-- Include in records.html, dashboard.html, patient_detail.html when patient.is_critical is detected -->
+<div class="alert alert-danger border-2 border-danger shadow-lg rounded-4 p-4 mb-4 position-relative emergency-pulse-banner" role="alert">
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+        <div class="d-flex align-items-center gap-3">
+            <div class="bg-danger text-white rounded-circle p-3 d-flex align-items-center justify-content-center shadow" style="width: 56px; height: 56px; min-width: 56px;">
+                <i class="fas fa-truck-medical fs-3 fa-beat"></i>
+            </div>
+            <div>
+                <span class="badge bg-danger text-white text-uppercase px-2 py-1 mb-1 font-monospace" style="letter-spacing: 1px;">
+                    <i class="fas fa-triangle-exclamation me-1"></i> EMERGENCY RED-FLAG TRIAGE
+                </span>
+                <h4 class="fw-bold mb-1 text-danger">CRITICAL VITALS DETECTED - IMMEDIATE ATTENTION REQUIRED</h4>
+                <div class="text-dark fw-semibold small">
+                    Patient: <span class="badge bg-dark font-monospace">{{ patient.name if patient else 'Beneficiary' }} ({{ patient.patient_uid if patient else 'UID' }})</span>
+                    &bull; Vitals: <span class="text-danger fw-bold">{{ critical_vitals_summary or 'BP / SpO2 / Blood Sugar in critical threshold' }}</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="d-flex flex-wrap align-items-center gap-2">
+            <!-- Quick Dial 108 Phone Link -->
+            <a href="tel:108" class="btn btn-danger btn-lg px-4 py-2 rounded-pill fw-bold shadow d-flex align-items-center gap-2">
+                <i class="fas fa-phone-volume fs-5"></i>
+                <span>CALL AMBULANCE (108)</span>
+            </a>
+
+            <!-- 1-Click Form Post to Log Ambulance Referral -->
+            {% if patient %}
+            <form method="POST" action="{{ url_for('features_bp.dispatch_ambulance', patient_id=patient.patient_uid) }}" class="d-inline" onsubmit="return confirm('Confirm dispatching 108 Emergency Ambulance for patient {{ patient.name }}?');">
+                <input type="hidden" name="vitals_summary" value="{{ critical_vitals_summary or 'Critical Hypertensive / Respiratory / Glycemic Emergency' }}">
+                <input type="hidden" name="chief_complaint" value="Critical Camp Triage Referral">
+                <button type="submit" class="btn btn-outline-danger btn-lg px-3 py-2 rounded-pill fw-semibold shadow-sm">
+                    <i class="fas fa-paper-plane me-1"></i> Log 108 Dispatch
+                </button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+
+<!-- 2. FLOATING HEALTH CAMP DOUBT-SOLVING CHATBOT WIDGET -->
+<!-- Include in base.html just before </body> -->
+<div id="campChatbotContainer" class="position-fixed bottom-0 end-0 p-3 no-print" style="z-index: 1060;">
+    <!-- Floating Trigger Button -->
+    <button id="chatbotToggleBtn" type="button" class="btn btn-primary rounded-circle shadow-lg d-flex align-items-center justify-content-center p-0 border border-2 border-white" style="width: 58px; height: 58px; background: linear-gradient(135deg, #1e3a8a, #2563eb);" title="Ask Health Camp Doubts">
+        <i class="fas fa-robot text-white fs-4" id="chatbotIcon"></i>
+        <span class="position-absolute top-0 start-100 translate-middle p-1 bg-success border border-light rounded-circle">
+            <span class="visually-hidden">Online</span>
+        </span>
+    </button>
+
+    <!-- Chat Window Card -->
+    <div id="chatbotCard" class="card border-0 shadow-24 rounded-4 overflow-hidden d-none mt-2" style="width: 360px; max-width: 90vw; height: 480px;">
+        <div class="card-header bg-primary text-white p-3 d-flex justify-content-between align-items-center" style="background: linear-gradient(135deg, #1e3a8a, #1e40af);">
+            <div class="d-flex align-items-center gap-2">
+                <div class="bg-white text-primary rounded-circle p-1 d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;">
+                    <i class="fas fa-heart-pulse"></i>
+                </div>
+                <div>
+                    <h6 class="fw-bold mb-0">Camp Assistant Bot</h6>
+                    <small class="text-white-50" style="font-size: 0.72rem;">Ask diet, medicine timings & counters</small>
+                </div>
+            </div>
+            <button type="button" class="btn-close btn-close-white btn-sm" id="chatbotCloseBtn" aria-label="Close"></button>
+        </div>
+
+        <!-- Messages Box -->
+        <div class="card-body p-3 overflow-auto bg-light" id="chatbotMessages" style="flex: 1 1 auto;">
+            <div class="d-flex gap-2 mb-3">
+                <div class="bg-primary text-white rounded-circle p-1 d-flex align-items-center justify-content-center align-self-start" style="width: 28px; height: 28px; min-width: 28px;">
+                    <i class="fas fa-robot" style="font-size: 0.75rem;"></i>
+                </div>
+                <div class="p-2 px-3 rounded-3 bg-white shadow-sm border small text-dark">
+                    Namaste! 🙏 I am your Camp AI Helper. Ask me anything:
+                    <div class="mt-2 d-flex flex-wrap gap-1">
+                        <button class="btn btn-outline-primary btn-sm py-0 px-2 quick-question" style="font-size: 0.72rem;" onclick="sendQuickQuery('Medicine timings')">💊 Medicine Timings</button>
+                        <button class="btn btn-outline-primary btn-sm py-0 px-2 quick-question" style="font-size: 0.72rem;" onclick="sendQuickQuery('Diet for high BP')">🥗 BP Diet</button>
+                        <button class="btn btn-outline-danger btn-sm py-0 px-2 quick-question" style="font-size: 0.72rem;" onclick="sendQuickQuery('Emergency 108 Ambulance')">🚨 108 Ambulance</button>
+                        <button class="btn btn-outline-secondary btn-sm py-0 px-2 quick-question" style="font-size: 0.72rem;" onclick="sendQuickQuery('Where is pharmacy counter?')">🏢 Counter Help</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chat Input Footer -->
+        <div class="card-footer bg-white p-2 border-top">
+            <form id="chatbotForm" class="input-group input-group-sm">
+                <input type="text" id="chatbotInput" class="form-control rounded-start-pill ps-3" placeholder="Type your question..." autocomplete="off" required>
+                <button class="btn btn-primary rounded-end-pill px-3" type="submit">
+                    <i class="fas fa-paper-plane"></i>
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+
+<!-- 3. PERSONALIZED INDIAN FOOD & DIET RECOMMENDATION CARD -->
+<!-- Include in patient_detail.html, patient_card.html, records.html -->
+<div class="card border-0 shadow-sm rounded-4 mb-4 bg-white overflow-hidden">
+    <div class="card-header bg-white py-3 px-4 border-bottom d-flex justify-content-between align-items-center">
+        <h6 class="fw-bold mb-0 text-dark">
+            <i class="fas fa-apple-whole text-success me-2"></i>Personalized Indian Food & Diet Recommendation (आहार परामर्श)
+        </h6>
+        <span class="badge bg-success-subtle text-success border border-success-subtle px-3 py-1">
+            Clinical Nutrition
+        </span>
+    </div>
+    <div class="card-body p-4">
+        <div class="row g-4">
+            <!-- Foods to Eat -->
+            <div class="col-12 col-md-6">
+                <div class="p-3 rounded-3 h-100" style="background-color: #f0fdf4; border-left: 4px solid #16a34a;">
+                    <h6 class="fw-bold text-success mb-2 d-flex align-items-center gap-2">
+                        <i class="fas fa-circle-check"></i>
+                        <span>Foods to Eat / खाने योग्य आहार</span>
+                    </h6>
+                    <ul class="mb-0 ps-3 small text-dark" style="line-height: 1.8;">
+                        {% if diet_plan and diet_plan.foods_to_eat %}
+                            {% for item in diet_plan.foods_to_eat %}
+                                <li>{{ item }}</li>
+                            {% endfor %}
+                        {% else %}
+                            <li>Seasonal green leafy vegetables (Palak, Methi, Lauki)</li>
+                            <li>Whole grain rotis (Wheat + Chana or Jowar) & Moong dal sprouts</li>
+                            <li>Plenty of clean boiled/filtered water throughout the day</li>
+                        {% endif %}
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Foods to Avoid -->
+            <div class="col-12 col-md-6">
+                <div class="p-3 rounded-3 h-100" style="background-color: #fef2f2; border-left: 4px solid #dc2626;">
+                    <h6 class="fw-bold text-danger mb-2 d-flex align-items-center gap-2">
+                        <i class="fas fa-circle-xmark"></i>
+                        <span>Foods to Avoid / परहेज योग्य आहार</span>
+                    </h6>
+                    <ul class="mb-0 ps-3 small text-dark" style="line-height: 1.8;">
+                        {% if diet_plan and diet_plan.foods_to_avoid %}
+                            {% for item in diet_plan.foods_to_avoid %}
+                                <li>{{ item }}</li>
+                            {% endfor %}
+                        {% else %}
+                            <li>Pickles (Aachar), Papad, and extra table salt</li>
+                            <li>Deep fried roadside snacks (Samosa, Pakoda, Puri)</li>
+                            <li>Excessive refined white sugar and maida confectioneries</li>
+                        {% endif %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        {% if diet_plan and diet_plan.lifestyle_tip %}
+        <div class="mt-3 p-2 px-3 rounded-3 bg-light border d-flex align-items-center gap-2 small text-muted">
+            <i class="fas fa-lightbulb text-warning fs-5"></i>
+            <div><strong>Physician Lifestyle Tip:</strong> {{ diet_plan.lifestyle_tip }}</div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+
+<!-- 4. AUTOMATED MEDICINE TIMING SMS & WHATSAPP SENDER COMPONENT -->
+<!-- Include in records.html, patient_card.html, patient_detail.html -->
+<div class="card border-0 shadow-sm rounded-4 mb-4 bg-white overflow-hidden">
+    <div class="card-header bg-white py-3 px-4 border-bottom d-flex justify-content-between align-items-center">
+        <h6 class="fw-bold mb-0 text-dark">
+            <i class="fas fa-clock text-primary me-2"></i>Daily Medicine Dosage Timings & Automated Reminders
+        </h6>
+        {% if whatsapp_url %}
+        <a href="{{ whatsapp_url }}" target="_blank" class="btn btn-success btn-sm rounded-pill px-3 shadow-sm fw-semibold">
+            <i class="fab fa-whatsapp me-1"></i> Send on WhatsApp
+        </a>
+        {% endif %}
+    </div>
+    <div class="card-body p-4">
+        <div class="row g-3 text-center">
+            <!-- Morning Slot -->
+            <div class="col-12 col-md-4">
+                <div class="p-3 rounded-3 bg-light border h-100">
+                    <div class="d-inline-flex p-2 rounded-circle bg-warning bg-opacity-10 text-warning mb-2">
+                        <i class="fas fa-sun fs-4"></i>
+                    </div>
+                    <h6 class="fw-bold text-dark mb-1">Morning / सुबह</h6>
+                    <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle mb-2">08:00 AM (नाश्ते के बाद)</span>
+                    <p class="small text-muted mb-0">Take blood pressure, thyroid, and daily multivitamins as prescribed.</p>
+                </div>
+            </div>
+
+            <!-- Afternoon Slot -->
+            <div class="col-12 col-md-4">
+                <div class="p-3 rounded-3 bg-light border h-100">
+                    <div class="d-inline-flex p-2 rounded-circle bg-info bg-opacity-10 text-info mb-2">
+                        <i class="fas fa-cloud-sun fs-4"></i>
+                    </div>
+                    <h6 class="fw-bold text-dark mb-1">Afternoon / दोपहर</h6>
+                    <span class="badge bg-info-subtle text-info-emphasis border border-info-subtle mb-2">01:30 PM (दोपहर भोजन के बाद)</span>
+                    <p class="small text-muted mb-0">Take prescribed antibiotics, digestive tablets, or antacid capsules.</p>
+                </div>
+            </div>
+
+            <!-- Night Slot -->
+            <div class="col-12 col-md-4">
+                <div class="p-3 rounded-3 bg-light border h-100">
+                    <div class="d-inline-flex p-2 rounded-circle bg-primary bg-opacity-10 text-primary mb-2">
+                        <i class="fas fa-moon fs-4"></i>
+                    </div>
+                    <h6 class="fw-bold text-dark mb-1">Night / रात</h6>
+                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle mb-2">08:30 PM (रात के खाने के बाद)</span>
+                    <p class="small text-muted mb-0">Take cholesterol, night antidiabetic, and allergy relief tablets.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<!-- 5. OFFLINE-FIRST LOCAL QUEUE SYNCHRONIZATION CONTROLS -->
+<!-- Include at the top of patients.html -->
+<div class="card border-0 shadow-sm rounded-4 mb-4 bg-white p-3 no-print" id="offlineQueueCard">
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+        <div class="d-flex align-items-center gap-3">
+            <div class="bg-primary-subtle text-primary rounded-circle p-3 d-flex align-items-center justify-content-center" style="width: 48px; height: 48px;">
+                <i class="fas fa-wifi-slash fs-4" id="networkStatusIcon"></i>
+            </div>
+            <div>
+                <h6 class="fw-bold mb-0 text-dark">
+                    Offline Registration Queue
+                    <span id="networkStatusBadge" class="badge bg-success-subtle text-success ms-2">Online</span>
+                </h6>
+                <small class="text-muted">Register patients even when field mobile network drops. Queue saves to local storage.</small>
+            </div>
+        </div>
+
+        <div class="d-flex align-items-center gap-2">
+            <span class="badge bg-dark rounded-pill px-3 py-2" id="offlineCountBadge">0 Pending Offline</span>
+            <button type="button" class="btn btn-warning btn-sm rounded-pill px-3 fw-semibold shadow-sm" id="syncOfflineBtn" onclick="syncOfflineQueue()">
+                <i class="fas fa-rotate me-1"></i> Auto-Sync Offline Registrations
+            </button>
+        </div>
+    </div>
+</div>
+
+
+<!-- 6. PREVIOUS CAMP VISITS HISTORY TIMELINE -->
+<!-- Include in patient_detail.html & patient_card.html -->
+<div class="card border-0 shadow-sm rounded-4 mb-4 bg-white overflow-hidden">
+    <div class="card-header bg-white py-3 px-4 border-bottom d-flex justify-content-between align-items-center">
+        <h6 class="fw-bold mb-0 text-dark">
+            <i class="fas fa-timeline text-primary me-2"></i>Previous Camp Visits History (पूर्व स्वास्थ्य जांच इतिहास)
+        </h6>
+        <span class="badge bg-primary-subtle text-primary border border-primary-subtle">
+            {{ patient.health_records|length if patient else 0 }} Past Visits
+        </span>
+    </div>
+    <div class="card-body p-4">
+        {% if patient and patient.health_records %}
+        <div class="timeline position-relative ps-4" style="border-left: 2px solid #e2e8f0;">
+            {% for r in patient.health_records %}
+            <div class="mb-4 position-relative">
+                <!-- Timeline Dot -->
+                <div class="position-absolute rounded-circle bg-primary" style="width: 12px; height: 12px; left: -25px; top: 4px; border: 2px solid #ffffff;"></div>
+
+                <div class="d-flex flex-wrap justify-content-between align-items-center mb-1">
+                    <span class="fw-bold text-dark fs-6">{{ r.camp.title if r.camp else 'Outreach Health Camp' }}</span>
+                    <span class="badge bg-light text-muted border font-monospace">{{ r.created_at.strftime('%d %B %Y') }}</span>
+                </div>
+                <div class="small text-muted mb-2">
+                    <i class="fas fa-user-doctor text-success me-1"></i>Dr. {{ r.doctor.name if r.doctor else 'Medical Officer' }} ({{ r.doctor.specialization if r.doctor else 'General' }})
+                    &bull; <i class="fas fa-location-dot text-danger me-1"></i>{{ r.camp.location_name if r.camp else 'Venue' }}
+                </div>
+                <div class="p-3 bg-light rounded-3 border small">
+                    <div class="mb-1"><strong>Diagnosis:</strong> <span class="text-danger fw-semibold">{{ r.diagnosis }}</span></div>
+                    <div><strong>Prescription:</strong> <span class="font-monospace text-dark">{{ r.prescription or 'No medicines recorded' }}</span></div>
+                    {% if r.doctor_notes %}
+                    <div class="mt-1 text-muted"><strong>Advice:</strong> {{ r.doctor_notes }}</div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center py-4 text-muted">
+            <i class="fas fa-notes-medical fs-1 d-block mb-2 text-secondary"></i>
+            <p class="mb-0">This is the beneficiary's first recorded health camp visit.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>

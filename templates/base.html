@@ -78,6 +78,11 @@
                             <i class="fas fa-pills me-2"></i>Pharmacy Inventory
                         </a>
                     </li>
+                    <li class="nav-item">
+                        <a class="nav-link px-3 py-2 rounded-2 {% if request.endpoint == 'features_bp.ambulance_logs' %}active bg-white bg-opacity-10 fw-semibold text-white{% endif %}" href="{{ url_for('features_bp.ambulance_logs') }}">
+                            <i class="fas fa-truck-medical me-2 text-warning"></i>108 Dispatches
+                        </a>
+                    </li>
                 </ul>
 
                 <!-- User Profile & Sign Out & Scan QR Button -->
@@ -327,6 +332,157 @@
                 }
             });
         }
+    });
+    </script>
+
+    <!-- Floating Health Camp Doubt-Solving Chatbot Widget -->
+    <div id="campChatbotContainer" class="position-fixed bottom-0 end-0 p-3 no-print" style="z-index: 1060;">
+        <!-- Floating Trigger Button -->
+        <button id="chatbotToggleBtn" type="button" class="btn btn-primary rounded-circle shadow-lg d-flex align-items-center justify-content-center p-0 border border-2 border-white" style="width: 58px; height: 58px; background: linear-gradient(135deg, #1e3a8a, #2563eb);" title="Ask Health Camp Doubts">
+            <i class="fas fa-robot text-white fs-4" id="chatbotIcon"></i>
+            <span class="position-absolute top-0 start-100 translate-middle p-1 bg-success border border-light rounded-circle">
+                <span class="visually-hidden">Online</span>
+            </span>
+        </button>
+
+        <!-- Chat Window Card -->
+        <div id="chatbotCard" class="card border-0 shadow-lg rounded-4 overflow-hidden d-none mt-2" style="width: 360px; max-width: 90vw; height: 480px; display: flex; flex-direction: column;">
+            <div class="card-header bg-primary text-white p-3 d-flex justify-content-between align-items-center" style="background: linear-gradient(135deg, #1e3a8a, #1e40af);">
+                <div class="d-flex align-items-center gap-2">
+                    <div class="bg-white text-primary rounded-circle p-1 d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;">
+                        <i class="fas fa-heart-pulse"></i>
+                    </div>
+                    <div>
+                        <h6 class="fw-bold mb-0">Camp Assistant Bot</h6>
+                        <small class="text-white-50" style="font-size: 0.72rem;">Ask diet, medicine timings & counters</small>
+                    </div>
+                </div>
+                <button type="button" class="btn-close btn-close-white btn-sm" id="chatbotCloseBtn" aria-label="Close"></button>
+            </div>
+
+            <!-- Messages Box -->
+            <div class="card-body p-3 overflow-auto bg-light" id="chatbotMessages" style="flex: 1 1 auto;">
+                <div class="d-flex gap-2 mb-3">
+                    <div class="bg-primary text-white rounded-circle p-1 d-flex align-items-center justify-content-center align-self-start" style="width: 28px; height: 28px; min-width: 28px;">
+                        <i class="fas fa-robot" style="font-size: 0.75rem;"></i>
+                    </div>
+                    <div class="p-2 px-3 rounded-3 bg-white shadow-sm border small text-dark">
+                        Namaste! 🙏 I am your Camp AI Helper. Ask me anything:
+                        <div class="mt-2 d-flex flex-wrap gap-1">
+                            <button class="btn btn-outline-primary btn-sm py-0 px-2 quick-question" style="font-size: 0.72rem;" onclick="sendQuickQuery('Medicine timings')">💊 Medicine Timings</button>
+                            <button class="btn btn-outline-primary btn-sm py-0 px-2 quick-question" style="font-size: 0.72rem;" onclick="sendQuickQuery('Diet for high BP')">🥗 BP Diet</button>
+                            <button class="btn btn-outline-danger btn-sm py-0 px-2 quick-question" style="font-size: 0.72rem;" onclick="sendQuickQuery('Emergency 108 Ambulance')">🚨 108 Ambulance</button>
+                            <button class="btn btn-outline-secondary btn-sm py-0 px-2 quick-question" style="font-size: 0.72rem;" onclick="sendQuickQuery('Where is pharmacy counter?')">🏢 Counter Help</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Chat Input Footer -->
+            <div class="card-footer bg-white p-2 border-top">
+                <form id="chatbotForm" class="input-group input-group-sm">
+                    <input type="text" id="chatbotInput" class="form-control rounded-start-pill ps-3" placeholder="Type your question..." autocomplete="off" required>
+                    <button class="btn btn-primary rounded-end-pill px-3" type="submit">
+                        <i class="fas fa-paper-plane"></i>
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chatbot Lifecycle Script -->
+    <script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const toggleBtn = document.getElementById('chatbotToggleBtn');
+        const card = document.getElementById('chatbotCard');
+        const closeBtn = document.getElementById('chatbotCloseBtn');
+        const form = document.getElementById('chatbotForm');
+        const input = document.getElementById('chatbotInput');
+        const msgContainer = document.getElementById('chatbotMessages');
+
+        if (!toggleBtn || !card) return;
+
+        const toggleChat = () => {
+            if (card.classList.contains('d-none')) {
+                card.classList.remove('d-none');
+                input.focus();
+            } else {
+                card.classList.add('d-none');
+            }
+        };
+
+        toggleBtn.addEventListener('click', toggleChat);
+        if (closeBtn) closeBtn.addEventListener('click', () => card.classList.add('d-none'));
+
+        window.sendQuickQuery = function (text) {
+            if (input) {
+                input.value = text;
+                form.dispatchEvent(new Event('submit'));
+            }
+        };
+
+        function formatBotResponse(text) {
+            let formatted = text
+                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                .replace(/\n/g, '<br/>');
+            return formatted;
+        }
+
+        form.addEventListener('submit', function (e) {
+            e.preventDefault();
+            const query = input.value.trim();
+            if (!query) return;
+
+            // Append user bubble
+            const userRow = document.createElement('div');
+            userRow.className = 'd-flex justify-content-end mb-2';
+            userRow.innerHTML = `<div class="p-2 px-3 rounded-3 bg-primary text-white small shadow-sm" style="max-width: 80%;">${query}</div>`;
+            msgContainer.appendChild(userRow);
+            input.value = '';
+            msgContainer.scrollTop = msgContainer.scrollHeight;
+
+            // Typing indicator
+            const typingRow = document.createElement('div');
+            typingRow.className = 'd-flex gap-2 mb-2 typing-indicator-row';
+            typingRow.innerHTML = `
+                <div class="bg-primary text-white rounded-circle p-1 d-flex align-items-center justify-content-center" style="width: 26px; height: 26px;">
+                    <i class="fas fa-robot" style="font-size: 0.7rem;"></i>
+                </div>
+                <div class="p-2 px-3 rounded-3 bg-white border text-muted small shadow-sm">
+                    <i class="fas fa-ellipsis fa-fade"></i> Camp Assistant is typing...
+                </div>`;
+            msgContainer.appendChild(typingRow);
+            msgContainer.scrollTop = msgContainer.scrollHeight;
+
+            fetch('/api/chatbot', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: query })
+            })
+            .then(res => res.json())
+            .then(data => {
+                typingRow.remove();
+                const botRow = document.createElement('div');
+                botRow.className = 'd-flex gap-2 mb-3';
+                botRow.innerHTML = `
+                    <div class="bg-primary text-white rounded-circle p-1 d-flex align-items-center justify-content-center align-self-start" style="width: 26px; height: 26px; min-width: 26px;">
+                        <i class="fas fa-robot" style="font-size: 0.7rem;"></i>
+                    </div>
+                    <div class="p-2 px-3 rounded-3 bg-white border small text-dark shadow-sm" style="max-width: 85%;">
+                        ${formatBotResponse(data.reply || 'Thank you for consulting. Please ask your camp volunteer if you need further help.')}
+                    </div>`;
+                msgContainer.appendChild(botRow);
+                msgContainer.scrollTop = msgContainer.scrollHeight;
+            })
+            .catch(err => {
+                typingRow.remove();
+                const errRow = document.createElement('div');
+                errRow.className = 'd-flex gap-2 mb-2 text-danger small';
+                errRow.innerHTML = `<span><i class="fas fa-triangle-exclamation me-1"></i>Could not connect to assistant.</span>`;
+                msgContainer.appendChild(errRow);
+            });
+        });
     });
     </script>
 

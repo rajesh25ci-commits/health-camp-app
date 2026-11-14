@@ -6,13 +6,38 @@
 <div class="row justify-content-center">
     <div class="col-12 col-xl-11">
 
+        <!-- Offline-First Local Queue Synchronization Controls -->
+        <div class="card border-0 shadow-sm rounded-4 mb-4 bg-white p-3 no-print hover-lift" id="offlineQueueCard">
+            <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="bg-primary-subtle text-primary rounded-circle p-3 d-flex align-items-center justify-content-center" style="width: 48px; height: 48px;">
+                        <i class="fas fa-wifi fs-4" id="networkStatusIcon"></i>
+                    </div>
+                    <div>
+                        <h6 class="fw-bold mb-0 text-dark">
+                            Offline Field Registration Queue
+                            <span id="networkStatusBadge" class="badge bg-success-subtle text-success ms-2">Online</span>
+                        </h6>
+                        <small class="text-muted">Register patients even when rural camp network drops. Queue persists in browser local storage.</small>
+                    </div>
+                </div>
+
+                <div class="d-flex align-items-center gap-2">
+                    <span class="badge bg-dark rounded-pill px-3 py-2" id="offlineCountBadge">0 Pending Offline</span>
+                    <button type="button" class="btn btn-warning btn-sm rounded-pill px-3 fw-semibold shadow-sm" id="syncOfflineBtn" onclick="syncOfflineQueue()">
+                        <i class="fas fa-rotate me-1"></i> Auto-Sync Offline Registrations
+                    </button>
+                </div>
+            </div>
+        </div>
+
         <!-- Page Header & Action Buttons -->
         <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
             <div>
                 <h3 class="fw-bold mb-1 text-dark">
                     <i class="fa-solid fa-hospital-user text-primary me-2"></i>Patient Directory & Demographics
                 </h3>
-                <p class="text-muted mb-0 small">Register community members, issue QR health passes, and track beneficiary records.</p>
+                <p class="text-muted mb-0 small">Auto-prioritized by Triage Urgency (EMERGENCY 🔴 &rarr; URGENT 🟡 &rarr; NORMAL 🟢).</p>
             </div>
             <div class="d-flex align-items-center gap-2">
                 <button type="button" class="btn btn-warning px-3 py-2 rounded-pill shadow-sm fw-semibold text-dark" data-bs-toggle="modal" data-bs-target="#qrScannerModal">
@@ -33,7 +58,7 @@
                             <span class="input-group-text bg-light border-end-0 text-muted">
                                 <i class="fa-solid fa-magnifying-glass"></i>
                             </span>
-                            <input type="text" class="form-control bg-light border-start-0" name="search" value="{{ search or '' }}" placeholder="Search by Patient Name, Phone, or UID (e.g. PAT-2026-0001)...">
+                            <input type="text" class="form-control bg-light border-start-0" name="search" value="{{ search or '' }}" placeholder="Search by Patient Name, Phone, Symptoms, or UID (e.g. PAT-2026-0001)...">
                         </div>
                     </div>
                     <div class="col-6 col-md-3 col-lg-2">
@@ -56,13 +81,17 @@
             </div>
         </div>
 
-        <!-- Patient Records Table -->
-        <div class="card border-0 shadow-sm rounded-3 bg-white">
-            <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+        <!-- Patient Records Table (Prioritized by Urgency) -->
+        <div class="card border-0 shadow-sm rounded-4 bg-white overflow-hidden">
+            <div class="card-header bg-white py-3 px-4 border-bottom d-flex justify-content-between align-items-center">
                 <span class="fw-bold text-dark">
-                    Showing {{ patients|length }} Registered Beneficiaries
+                    Beneficiary Queue ({{ patients|length }})
                 </span>
-                <span class="text-muted small">Updated in real-time</span>
+                <span class="text-muted small">
+                    <span class="badge bg-danger me-1">EMERGENCY</span>
+                    <span class="badge bg-warning text-dark me-1">URGENT</span>
+                    <span class="badge bg-success">NORMAL</span>
+                </span>
             </div>
             <div class="card-body p-0">
                 <div class="table-responsive">
@@ -70,9 +99,9 @@
                         <thead class="table-light">
                             <tr class="small text-muted text-uppercase">
                                 <th class="ps-3">Photo</th>
-                                <th>Patient UID</th>
-                                <th>Full Name</th>
-                                <th>Demographics</th>
+                                <th>Patient UID & Urgency</th>
+                                <th>Full Name & Demographics</th>
+                                <th>Presenting Symptoms ('Kya Problem Hai?')</th>
                                 <th>Contact & Address</th>
                                 <th>Digital QR</th>
                                 <th class="text-end pe-3">Actions</th>
@@ -81,7 +110,7 @@
                         <tbody>
                             {% if patients %}
                                 {% for p in patients %}
-                                <tr>
+                                <tr class="{% if p.urgency_level == 'EMERGENCY' %}table-danger border-start border-danger border-4{% elif p.urgency_level == 'URGENT' %}table-warning border-start border-warning border-3{% endif %}">
                                     <td class="ps-3">
                                         {% if p.photo_filename %}
                                             <img src="{{ url_for('static', filename='uploads/' + p.photo_filename) }}" alt="Photo" class="rounded-circle object-fit-cover border shadow-sm" width="42" height="42">
@@ -92,27 +121,46 @@
                                         {% endif %}
                                     </td>
                                     <td>
-                                        <span class="badge bg-secondary-subtle text-secondary font-monospace px-2 py-1">
-                                            {{ p.patient_uid }}
-                                        </span>
+                                        <div class="d-flex flex-column align-items-start gap-1">
+                                            <span class="badge bg-secondary-subtle text-secondary font-monospace px-2 py-1">
+                                                {{ p.patient_uid }}
+                                            </span>
+                                            {% if p.urgency_level == 'EMERGENCY' %}
+                                                <span class="badge bg-danger text-white pulse-emergency" style="font-size: 0.7rem;">
+                                                    <i class="fas fa-truck-medical me-1"></i>EMERGENCY
+                                                </span>
+                                            {% elif p.urgency_level == 'URGENT' %}
+                                                <span class="badge bg-warning text-dark border border-warning" style="font-size: 0.7rem;">
+                                                    <i class="fas fa-bell me-1"></i>URGENT
+                                                </span>
+                                            {% else %}
+                                                <span class="badge bg-success-subtle text-success border border-success-subtle" style="font-size: 0.7rem;">
+                                                    <i class="fas fa-circle-check me-1"></i>NORMAL
+                                                </span>
+                                            {% endif %}
+                                        </div>
                                     </td>
                                     <td>
-                                        <a href="{{ url_for('patient_detail', id=p.id) }}" class="fw-bold text-dark text-decoration-none">
+                                        <a href="{{ url_for('patient_detail', id=p.id) }}" class="fw-bold text-dark text-decoration-none d-block">
                                             {{ p.name }}
                                         </a>
-                                        <small class="text-muted d-block" style="font-size: 0.75rem;">Reg: {{ p.created_at.strftime('%d %b %Y') }}</small>
+                                        <small class="text-muted" style="font-size: 0.75rem;">
+                                            {{ p.age }} yrs &bull; {{ p.gender }} &bull; Reg: {{ p.created_at.strftime('%d %b') }}
+                                        </small>
                                     </td>
                                     <td>
-                                        <span class="fw-semibold">{{ p.age }} yrs</span>
-                                        <span class="text-muted">&bull; {{ p.gender }}</span>
+                                        <div class="p-2 rounded bg-light border small text-dark font-monospace" style="max-width: 260px;">
+                                            <i class="fas fa-notes-medical text-primary me-1"></i>
+                                            {{ p.symptoms or 'Routine health checkup / No acute complaint' }}
+                                        </div>
                                     </td>
                                     <td>
                                         <div class="small"><i class="fa-solid fa-phone me-1 text-muted"></i>{{ p.phone or 'N/A' }}</div>
-                                        <small class="text-muted text-truncate d-inline-block" style="max-width: 180px;">{{ p.address or 'No address' }}</small>
+                                        <small class="text-muted text-truncate d-inline-block" style="max-width: 170px;">{{ p.address or 'No address' }}</small>
                                     </td>
                                     <td>
                                         <a href="{{ url_for('patient_card', id=p.id) }}" title="Open Patient Digital Verification Card">
-                                            <img src="{{ url_for('static', filename=p.qr_code_path) if p.qr_code_path else url_for('static', filename='qrcodes/default_qr.png') }}" alt="QR Code" width="38" height="38" class="rounded border p-1 bg-white">
+                                            <img src="{{ url_for('static', filename=p.qr_code_path) if p.qr_code_path else url_for('static', filename='qrcodes/default_qr.png') }}" alt="QR Code" width="38" height="38" class="rounded border p-1 bg-white shadow-sm">
                                         </a>
                                     </td>
                                     <td class="text-end pe-3">
@@ -121,7 +169,7 @@
                                                 <i class="fas fa-id-card"></i>
                                             </a>
                                             <a href="{{ url_for('patient_detail', id=p.id) }}" class="btn btn-outline-primary" title="View Clinical Profile">
-                                                <i class="fa-solid fa-eye me-1"></i> View
+                                                <i class="fa-solid fa-eye"></i>
                                             </a>
                                             <a href="{{ url_for('patient_pdf', id=p.id) }}" class="btn btn-outline-danger" title="Download Official Medical Card">
                                                 <i class="fa-solid fa-file-pdf"></i>
@@ -152,32 +200,32 @@
     </div>
 </div>
 
-<!-- Modal: Register New Patient -->
+<!-- Modal: Register New Patient (With Symptoms & Urgency Selector) -->
 <div class="modal fade" id="registerPatientModal" tabindex="-1" aria-labelledby="registerPatientModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-lg">
-        <div class="modal-content border-0 shadow">
-            <form method="POST" action="{{ url_for('patient_add') }}" enctype="multipart/form-data">
-                <div class="modal-header bg-primary text-white">
+        <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
+            <form id="registerPatientForm" method="POST" action="{{ url_for('patient_add') }}" enctype="multipart/form-data">
+                <div class="modal-header bg-primary text-white" style="background: linear-gradient(135deg, #1e3a8a, #2563eb);">
                     <h5 class="modal-title fw-bold" id="registerPatientModalLabel">
                         <i class="fa-solid fa-user-plus me-2"></i>Register New Health Camp Beneficiary
                     </h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body p-4">
-                    <p class="text-muted small mb-3">Complete the form below. A permanent UID and dynamic QR Code health pass will be generated automatically upon registration.</p>
+                    <p class="text-muted small mb-3">Complete demographic intake and record presenting symptoms. An encrypted QR Code health pass and triage priority token will be generated automatically.</p>
 
                     <div class="row g-3">
                         <div class="col-12 col-md-8">
                             <label class="form-label fw-semibold">Patient Full Name <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control" name="name" placeholder="e.g. Ramesh Kumar Patel" required>
+                            <input type="text" class="form-control" name="name" id="patientNameInput" placeholder="e.g. Ramesh Kumar Patel" required>
                         </div>
                         <div class="col-6 col-md-2">
                             <label class="form-label fw-semibold">Age <span class="text-danger">*</span></label>
-                            <input type="number" class="form-control" name="age" min="1" max="130" placeholder="e.g. 45" required>
+                            <input type="number" class="form-control" name="age" id="patientAgeInput" min="1" max="130" placeholder="e.g. 45" required>
                         </div>
                         <div class="col-6 col-md-2">
                             <label class="form-label fw-semibold">Gender <span class="text-danger">*</span></label>
-                            <select class="form-select" name="gender" required>
+                            <select class="form-select" name="gender" id="patientGenderInput" required>
                                 <option value="Male">Male</option>
                                 <option value="Female">Female</option>
                                 <option value="Other">Other</option>
@@ -186,23 +234,71 @@
 
                         <div class="col-12 col-md-6">
                             <label class="form-label fw-semibold">Phone Number</label>
-                            <input type="tel" class="form-control" name="phone" placeholder="+91 98765 43210">
+                            <input type="tel" class="form-control" name="phone" id="patientPhoneInput" placeholder="+91 98765 43210">
                         </div>
                         <div class="col-12 col-md-6">
                             <label class="form-label fw-semibold">Beneficiary Photo Upload</label>
-                            <input type="file" name="photo" class="form-control" accept="image/*">
+                            <input type="file" name="photo" id="patientPhotoInput" class="form-control" accept="image/*">
                             <small class="text-muted" style="font-size: 0.75rem;">Supported formats: PNG, JPG, JPEG, WEBP (Max 16MB)</small>
                         </div>
 
                         <div class="col-12">
                             <label class="form-label fw-semibold">Residential Address / Ward / Village</label>
-                            <textarea class="form-control" name="address" rows="2" placeholder="e.g. Plot 45, Near Civic Center, Nagpur"></textarea>
+                            <textarea class="form-control" name="address" id="patientAddressInput" rows="2" placeholder="e.g. Plot 45, Near Civic Center, Nagpur"></textarea>
                         </div>
+
+                        <!-- 1. Presenting Problem / Symptoms (Kya Problem Hai?) -->
+                        <div class="col-12">
+                            <label class="form-label fw-semibold text-dark">
+                                Presenting Problem / Symptoms (Kya Problem Hai?) <span class="text-danger">*</span>
+                            </label>
+                            <textarea class="form-control font-monospace" name="symptoms" id="patientSymptomsInput" rows="2" placeholder="e.g., High fever since 2 days, Chest pain, High BP, Weakness..." required></textarea>
+                            <!-- Quick Symptom Tags -->
+                            <div class="mt-2 d-flex flex-wrap gap-1 align-items-center">
+                                <span class="text-muted small me-1">Quick Select:</span>
+                                <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2 rounded-pill small" onclick="appendModalSymptom('High fever since 2 days')">🌡️ Fever</button>
+                                <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2 rounded-pill small" onclick="appendModalSymptom('Cough & cold with throat pain')">☕ Cough/Cold</button>
+                                <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2 rounded-pill small" onclick="appendModalSymptom('High BP & dizziness')">❤️ High BP</button>
+                                <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2 rounded-pill small" onclick="appendModalSymptom('Acidity & stomach pain')">🌿 Acidity</button>
+                                <button type="button" class="btn btn-outline-danger btn-sm py-0 px-2 rounded-pill small" onclick="appendModalEmergency('Chest pain & breathlessness')">🚨 Chest Pain (Emergency)</button>
+                            </div>
+                        </div>
+
+                        <!-- 2. Urgency / Triage Level Radio Button Selector -->
+                        <div class="col-12">
+                            <label class="form-label fw-semibold text-dark d-block">
+                                Urgency / Triage Level <span class="text-danger">*</span>
+                            </label>
+                            <div class="row g-2">
+                                <div class="col-12 col-md-4">
+                                    <input type="radio" class="btn-check" name="urgency_level" id="modalUrgencyNormal" value="NORMAL" checked>
+                                    <label class="btn btn-outline-success w-100 py-2 rounded-3 text-start small shadow-sm" for="modalUrgencyNormal">
+                                        <span class="fw-bold d-block"><i class="fas fa-circle-check me-1"></i> NORMAL</span>
+                                        <small class="text-muted d-block" style="font-size: 0.72rem;">🟢 Normal Checkup — default</small>
+                                    </label>
+                                </div>
+                                <div class="col-12 col-md-4">
+                                    <input type="radio" class="btn-check" name="urgency_level" id="modalUrgencyUrgent" value="URGENT">
+                                    <label class="btn btn-outline-warning w-100 py-2 rounded-3 text-start small shadow-sm" for="modalUrgencyUrgent">
+                                        <span class="fw-bold d-block text-dark"><i class="fas fa-bell me-1"></i> URGENT</span>
+                                        <small class="text-muted d-block" style="font-size: 0.72rem;">🟡 Urgent — Priority Queue</small>
+                                    </label>
+                                </div>
+                                <div class="col-12 col-md-4">
+                                    <input type="radio" class="btn-check" name="urgency_level" id="modalUrgencyEmergency" value="EMERGENCY">
+                                    <label class="btn btn-outline-danger w-100 py-2 rounded-3 text-start small shadow-sm" for="modalUrgencyEmergency">
+                                        <span class="fw-bold d-block"><i class="fas fa-truck-medical me-1"></i> EMERGENCY</span>
+                                        <small class="text-muted d-block" style="font-size: 0.72rem;">🔴 Critical — Immediate Doctor + 108</small>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
                     </div>
                 </div>
                 <div class="modal-footer bg-light">
                     <button type="button" class="btn btn-secondary px-3" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary px-4">
+                    <button type="submit" class="btn btn-primary px-4 shadow">
                         <i class="fa-solid fa-check me-1"></i> Save & Generate QR Pass
                     </button>
                 </div>
@@ -210,4 +306,173 @@
         </div>
     </div>
 </div>
+
+<script>
+function appendModalSymptom(text) {
+    const input = document.getElementById('patientSymptomsInput');
+    if (!input) return;
+    if (input.value.trim() === '') {
+        input.value = text;
+    } else if (!input.value.includes(text)) {
+        input.value += ', ' + text;
+    }
+    input.focus();
+}
+
+function appendModalEmergency(text) {
+    appendModalSymptom(text);
+    const radio = document.getElementById('modalUrgencyEmergency');
+    if (radio) radio.checked = true;
+}
+
+// ==========================================
+// Offline Queue & Local Storage Synchronization
+// ==========================================
+const OFFLINE_KEY = 'healthcamp_offline_patients';
+
+function getOfflineQueue() {
+    try {
+        const stored = localStorage.getItem(OFFLINE_KEY);
+        return stored ? JSON.parse(stored) : [];
+    } catch(e) {
+        return [];
+    }
+}
+
+function updateOfflineBadge() {
+    const queue = getOfflineQueue();
+    const badge = document.getElementById('offlineCountBadge');
+    if (badge) {
+        badge.innerText = `${queue.length} Pending Offline`;
+        if (queue.length > 0) {
+            badge.className = 'badge bg-warning text-dark rounded-pill px-3 py-2 fw-bold';
+        } else {
+            badge.className = 'badge bg-dark rounded-pill px-3 py-2';
+        }
+    }
+}
+
+function updateNetworkStatus() {
+    const isOnline = navigator.onLine;
+    const badge = document.getElementById('networkStatusBadge');
+    const icon = document.getElementById('networkStatusIcon');
+
+    if (badge && icon) {
+        if (isOnline) {
+            badge.innerText = 'Online';
+            badge.className = 'badge bg-success-subtle text-success ms-2';
+            icon.className = 'fas fa-wifi fs-4 text-primary';
+        } else {
+            badge.innerText = 'Offline (Field Mode)';
+            badge.className = 'badge bg-danger text-white ms-2';
+            icon.className = 'fas fa-wifi-slash fs-4 text-danger';
+        }
+    }
+}
+
+window.addEventListener('online', () => {
+    updateNetworkStatus();
+    const queue = getOfflineQueue();
+    if (queue.length > 0) {
+        if (confirm(`Network re-established! You have ${queue.length} offline patient registration(s) pending. Sync now?`)) {
+            syncOfflineQueue();
+        }
+    }
+});
+
+window.addEventListener('offline', updateNetworkStatus);
+
+document.addEventListener('DOMContentLoaded', () => {
+    updateNetworkStatus();
+    updateOfflineBadge();
+
+    const form = document.getElementById('registerPatientForm');
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            if (!navigator.onLine) {
+                e.preventDefault();
+                const name = document.getElementById('patientNameInput').value.trim();
+                const age = document.getElementById('patientAgeInput').value.trim();
+                const gender = document.getElementById('patientGenderInput').value;
+                const phone = document.getElementById('patientPhoneInput').value.trim();
+                const address = document.getElementById('patientAddressInput').value.trim();
+                const symptoms = document.getElementById('patientSymptomsInput').value.trim();
+                
+                let urgency = 'NORMAL';
+                if (document.getElementById('modalUrgencyEmergency') && document.getElementById('modalUrgencyEmergency').checked) {
+                    urgency = 'EMERGENCY';
+                } else if (document.getElementById('modalUrgencyUrgent') && document.getElementById('modalUrgencyUrgent').checked) {
+                    urgency = 'URGENT';
+                }
+
+                if (!name || !age || !symptoms) {
+                    alert('Please enter patient name, age, and symptoms.');
+                    return;
+                }
+
+                const offlineRecord = {
+                    name: name,
+                    age: parseInt(age),
+                    gender: gender,
+                    phone: phone,
+                    address: address,
+                    symptoms: symptoms,
+                    urgency_level: urgency,
+                    saved_at: new Date().toISOString()
+                };
+
+                const queue = getOfflineQueue();
+                queue.push(offlineRecord);
+                localStorage.setItem(OFFLINE_KEY, JSON.stringify(queue));
+                updateOfflineBadge();
+
+                alert(`📡 Offline Mode: Registration for ${name} (${urgency}) saved to local queue! It will sync automatically when network returns.`);
+                form.reset();
+                const modalEl = document.getElementById('registerPatientModal');
+                const modal = bootstrap.Modal.getInstance(modalEl);
+                if (modal) modal.hide();
+            }
+        });
+    }
+});
+
+async function syncOfflineQueue() {
+    const queue = getOfflineQueue();
+    if (!queue || queue.length === 0) {
+        alert('No pending offline registrations in queue.');
+        return;
+    }
+
+    const syncBtn = document.getElementById('syncOfflineBtn');
+    if (syncBtn) {
+        syncBtn.disabled = true;
+        syncBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Syncing...';
+    }
+
+    try {
+        const response = await fetch('/api/offline-sync', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ patients: queue })
+        });
+        const data = await response.json();
+
+        if (data.success) {
+            localStorage.removeItem(OFFLINE_KEY);
+            updateOfflineBadge();
+            alert(`✅ Success: ${data.synced_count} offline beneficiary records synchronized to health camp database!`);
+            window.location.reload();
+        } else {
+            alert('⚠️ Sync error: ' + (data.error || 'Failed to sync'));
+        }
+    } catch (err) {
+        alert('❌ Network error during sync. Ensure internet connection is active.');
+    } finally {
+        if (syncBtn) {
+            syncBtn.disabled = false;
+            syncBtn.innerHTML = '<i class="fas fa-rotate me-1"></i> Auto-Sync Offline Registrations';
+        }
+    }
+}
+</script>
 {% endblock %}
