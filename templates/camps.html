@@ -3,16 +3,75 @@
 {% block title %}Health Camp Operations & GIS Map{% endblock %}
 
 {% block head %}
+<!-- Leaflet Routing Machine CSS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
 <style>
     #campMap {
-        height: 450px;
+        height: 520px;
         width: 100%;
-        border-radius: 12px;
+        border-radius: 14px;
         z-index: 1;
     }
+
     .leaflet-popup-content-wrapper {
-        border-radius: 8px;
-        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        border-radius: 12px;
+        box-shadow: 0 12px 28px rgba(0, 0, 0, 0.15);
+    }
+
+    /* Rapido Floating Navigation Route Card */
+    .rapido-nav-card {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(12px);
+        border: 2px solid #0284c7;
+        border-radius: 18px;
+        box-shadow: 0 16px 36px rgba(2, 132, 199, 0.2);
+        transition: all 0.3s ease;
+    }
+
+    /* Live Search Suggestions Dropdown */
+    .search-suggestions-box {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: #ffffff;
+        border: 1px solid #cbd5e1;
+        border-radius: 12px;
+        box-shadow: 0 12px 24px rgba(0, 0, 0, 0.12);
+        max-height: 250px;
+        overflow-y: auto;
+        z-index: 1050;
+        display: none;
+    }
+
+    .suggestion-item {
+        padding: 8px 12px;
+        cursor: pointer;
+        font-size: 0.85rem;
+        border-bottom: 1px solid #f1f5f9;
+        transition: background 0.15s;
+    }
+
+    .suggestion-item:hover {
+        background: #e0f2fe;
+        color: #0369a1;
+    }
+
+    /* Pulsating User Live Location Marker */
+    .user-pulse-marker {
+        width: 18px;
+        height: 18px;
+        background: #0284c7;
+        border: 3px solid #ffffff;
+        border-radius: 50%;
+        box-shadow: 0 0 12px #0284c7;
+        animation: pulseAnimation 2s infinite;
+    }
+
+    @keyframes pulseAnimation {
+        0% { box-shadow: 0 0 0 0 rgba(2, 132, 199, 0.7); }
+        70% { box-shadow: 0 0 0 16px rgba(2, 132, 199, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(2, 132, 199, 0); }
     }
 </style>
 {% endblock %}
@@ -25,11 +84,14 @@
         <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
             <div>
                 <h3 class="fw-bold mb-1 text-dark">
-                    <i class="fa-solid fa-map-location-dot text-primary me-2"></i>Health Camp Operations & Geo-Locations
+                    <i class="fa-solid fa-map-location-dot text-primary me-2"></i>Health Camp Operations & GIS Map
                 </h3>
-                <p class="text-muted mb-0 small">Interactive geospatial mapping, camp scheduling, and beneficiary capacity management.</p>
+                <p class="text-muted mb-0 small">Rapido-style live route navigation, Nominatim place search, and health camp outreach scheduling.</p>
             </div>
-            <div>
+            <div class="d-flex gap-2 flex-wrap">
+                <button type="button" class="btn btn-outline-primary px-3 py-2 rounded-pill shadow-sm" onclick="locateUserPosition()">
+                    <i class="fa-solid fa-location-crosshairs me-1"></i> My Location
+                </button>
                 <button type="button" class="btn btn-primary px-4 py-2 rounded-pill shadow-sm" data-bs-toggle="modal" data-bs-target="#scheduleCampModal">
                     <i class="fa-solid fa-plus me-2"></i>Schedule New Health Camp
                 </button>
@@ -38,19 +100,83 @@
 
         <!-- Interactive Leaflet.js Map Section -->
         <div class="card border-0 shadow-sm rounded-4 mb-4 bg-white overflow-hidden">
-            <div class="card-header bg-white py-3 px-4 border-bottom d-flex justify-content-between align-items-center">
-                <div>
-                    <h6 class="fw-bold mb-0 text-dark">
-                        <i class="fa-solid fa-map me-2 text-danger"></i>Interactive Camp Outreaches Map
-                    </h6>
-                    <small class="text-muted">Click anywhere on the map to capture Coordinates (Lat/Long) for new camp scheduling</small>
+            <div class="card-header bg-white py-3 px-4 border-bottom d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+                <div class="d-flex align-items-center gap-2">
+                    <div class="bg-danger text-white rounded-circle p-2 d-flex align-items-center justify-content-center" style="width: 34px; height: 34px;">
+                        <i class="fa-solid fa-map-pin"></i>
+                    </div>
+                    <div>
+                        <h6 class="fw-bold mb-0 text-dark">Interactive Camp Outreaches Map</h6>
+                        <small class="text-muted">Defaults to India &bull; Click anywhere or search below to pin camp location</small>
+                    </div>
                 </div>
-                <span class="badge bg-primary-subtle text-primary border border-primary-subtle">
-                    {{ camps|length }} Camps Mapped
-                </span>
+
+                <!-- Live Location Search Bar (OSM Nominatim) -->
+                <div class="position-relative" style="min-width: 320px; max-width: 440px;">
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text bg-light border-end-0"><i class="fa-solid fa-magnifying-glass text-primary"></i></span>
+                        <input type="text" id="mapSearchInput" class="form-control border-start-0" placeholder="Search place in India (e.g. RNSIT, Bengaluru)..." autocomplete="off" oninput="debounceNominatimSearch(this.value, 'mapSearchSuggestions')">
+                        <button class="btn btn-primary px-3" type="button" onclick="triggerSearch('mapSearchInput', 'mapSearchSuggestions')">
+                            Search
+                        </button>
+                    </div>
+                    <!-- Suggestions Box -->
+                    <div id="mapSearchSuggestions" class="search-suggestions-box"></div>
+                </div>
             </div>
-            <div class="card-body p-3">
+
+            <!-- City Shortcut Pills -->
+            <div class="px-4 py-2 bg-light border-bottom d-flex align-items-center flex-wrap gap-2 small">
+                <span class="text-muted fw-semibold me-1"><i class="fa-solid fa-city me-1"></i>Jump to:</span>
+                <button type="button" class="btn btn-sm btn-white border rounded-pill py-0 px-2" onclick="jumpToCity(12.9716, 77.5946, 12, 'Bengaluru')">📍 Bengaluru</button>
+                <button type="button" class="btn btn-sm btn-white border rounded-pill py-0 px-2" onclick="jumpToCity(21.1458, 79.0882, 12, 'Nagpur')">📍 Nagpur</button>
+                <button type="button" class="btn btn-sm btn-white border rounded-pill py-0 px-2" onclick="jumpToCity(19.0760, 72.8777, 12, 'Mumbai')">📍 Mumbai</button>
+                <button type="button" class="btn btn-sm btn-white border rounded-pill py-0 px-2" onclick="jumpToCity(28.6139, 77.2090, 12, 'Delhi')">📍 Delhi</button>
+                <button type="button" class="btn btn-sm btn-white border rounded-pill py-0 px-2" onclick="jumpToCity(20.5937, 78.9629, 5, 'India Overview')">🇮🇳 Entire India</button>
+            </div>
+
+            <div class="card-body p-3 position-relative">
                 <div id="campMap"></div>
+
+                <!-- Floating Rapido-Style Live Navigation Summary Card (Hidden by default) -->
+                <div id="rapidoNavCard" class="rapido-nav-card p-3 p-md-4 position-absolute start-50 translate-middle-x" style="bottom: 24px; width: 90%; max-width: 580px; z-index: 1000; display: none;">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="badge bg-warning text-dark px-2 py-1 rounded-pill fw-bold" style="font-size: 0.75rem;">
+                                <i class="fa-solid fa-motorcycle me-1"></i> RAPIDO LIVE ROUTE
+                            </span>
+                            <span class="badge bg-info-subtle text-info border border-info-subtle px-2 py-1 rounded-pill" style="font-size: 0.72rem;">
+                                Live GPS Directions
+                            </span>
+                        </div>
+                        <button type="button" class="btn-close btn-sm" onclick="clearLiveRoute()" aria-label="Close"></button>
+                    </div>
+
+                    <div class="row align-items-center g-2 mb-3">
+                        <div class="col-6">
+                            <div class="small text-muted text-uppercase fw-semibold" style="font-size: 0.72rem;">Distance</div>
+                            <div class="display-6 fw-bold text-primary mb-0" id="routeDistanceText">-- km</div>
+                        </div>
+                        <div class="col-6">
+                            <div class="small text-muted text-uppercase fw-semibold" style="font-size: 0.72rem;">Est. Travel Time</div>
+                            <div class="display-6 fw-bold text-success mb-0" id="routeTimeText">-- mins</div>
+                        </div>
+                    </div>
+
+                    <div class="p-2 rounded-3 bg-light border small text-dark mb-3">
+                        <i class="fa-solid fa-location-dot text-danger me-1"></i>
+                        Destination: <strong id="routeDestText">Selected Health Camp</strong>
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        <a id="btnExternalGoogleMaps" href="#" target="_blank" class="btn btn-success btn-sm rounded-pill flex-grow-1 fw-semibold py-2">
+                            <i class="fa-brands fa-google me-1"></i> Open Google Maps Navigation
+                        </a>
+                        <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill px-3" onclick="clearLiveRoute()">
+                            Clear
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -72,7 +198,7 @@
                                 <th>Scheduled Date</th>
                                 <th>Target Capacity</th>
                                 <th>Operational Status</th>
-                                <th class="text-end pe-4">Actions</th>
+                                <th class="text-end pe-4">Directions & Actions</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -112,12 +238,26 @@
                                     <td class="text-end pe-4">
                                         <div class="btn-group btn-group-sm">
                                             {% if c.latitude and c.longitude %}
-                                                <button class="btn btn-outline-primary" onclick="focusCampOnMap({{ c.latitude }}, {{ c.longitude }}, '{{ c.title|replace('\'', '\\\'') }}')" title="Locate on Map">
-                                                    <i class="fas fa-crosshairs me-1"></i> Locate
+                                                <button class="btn btn-warning text-dark fw-semibold" 
+                                                        data-lat="{{ c.latitude }}" 
+                                                        data-lng="{{ c.longitude }}" 
+                                                        data-title="{{ c.title }}" 
+                                                        data-location="{{ c.location_name }}" 
+                                                        onclick="getLiveRouteToCamp(this)" 
+                                                        title="Show Live Rapido Route">
+                                                    <i class="fa-solid fa-route me-1"></i> Directions
+                                                </button>
+                                                <button class="btn btn-outline-primary" 
+                                                        data-lat="{{ c.latitude }}" 
+                                                        data-lng="{{ c.longitude }}" 
+                                                        data-title="{{ c.title }}" 
+                                                        onclick="focusCampOnMap(this)" 
+                                                        title="Locate on Map">
+                                                    <i class="fas fa-crosshairs"></i>
                                                 </button>
                                             {% endif %}
                                             <a href="{{ url_for('camp_report', camp_id=c.id) }}" class="btn btn-outline-danger" title="Download Official Camp Report">
-                                                <i class="fas fa-file-pdf me-1"></i> Report
+                                                <i class="fas fa-file-pdf"></i>
                                             </a>
                                         </div>
                                     </td>
@@ -139,7 +279,7 @@
     </div>
 </div>
 
-<!-- Modal: Schedule New Camp -->
+<!-- Modal: Schedule New Camp with Nominatim Live Place Search -->
 <div class="modal fade" id="scheduleCampModal" tabindex="-1" aria-labelledby="scheduleCampModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content border-0 shadow">
@@ -152,24 +292,47 @@
                 </div>
                 <div class="modal-body p-4">
                     <div class="row g-3">
+
+                        <!-- Camp Title -->
                         <div class="col-12">
                             <label class="form-label fw-semibold">Camp Title / Campaign Name <span class="text-danger">*</span></label>
                             <input type="text" class="form-control" name="title" placeholder="e.g. Free Eye & Primary Health Outreach Camp" required>
                         </div>
+
+                        <!-- Live Nominatim Location Search Bar inside Modal -->
+                        <div class="col-12">
+                            <label class="form-label fw-semibold text-primary">
+                                <i class="fa-solid fa-map-pin me-1"></i> Search Venue in India (Auto-Geocode Coordinates)
+                            </label>
+                            <div class="position-relative">
+                                <div class="input-group">
+                                    <span class="input-group-text bg-light"><i class="fa-solid fa-magnifying-glass"></i></span>
+                                    <input type="text" id="modalSearchInput" class="form-control" placeholder="Type place (e.g. RNSIT College, Bengaluru)..." autocomplete="off" oninput="debounceNominatimSearch(this.value, 'modalSearchSuggestions', true)">
+                                </div>
+                                <div id="modalSearchSuggestions" class="search-suggestions-box"></div>
+                            </div>
+                            <small class="text-muted" style="font-size: 0.72rem;">Selecting a result auto-fills address, coordinates, and pins the map.</small>
+                        </div>
+
+                        <!-- Location Name / Venue Address -->
                         <div class="col-12">
                             <label class="form-label fw-semibold">Location / Venue Address <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control" name="location_name" placeholder="e.g. Community Civic Center, Sector 4, Nagpur" required>
+                            <input type="text" class="form-control" id="modalLocationName" name="location_name" placeholder="e.g. Community Civic Center, Sector 4, Nagpur" required>
                         </div>
+
+                        <!-- Lat & Long -->
                         <div class="col-12 col-md-6">
                             <label class="form-label fw-semibold">Latitude</label>
-                            <input type="number" step="any" class="form-control" id="modalLatitude" name="latitude" placeholder="e.g. 21.1458">
-                            <small class="text-muted" style="font-size: 0.75rem;">(Auto-filled when you click on the map)</small>
+                            <input type="number" step="any" class="form-control" id="modalLatitude" name="latitude" placeholder="e.g. 12.9716">
+                            <small class="text-muted" style="font-size: 0.75rem;">(Auto-filled via search or map click)</small>
                         </div>
                         <div class="col-12 col-md-6">
                             <label class="form-label fw-semibold">Longitude</label>
-                            <input type="number" step="any" class="form-control" id="modalLongitude" name="longitude" placeholder="e.g. 79.0882">
-                            <small class="text-muted" style="font-size: 0.75rem;">(Auto-filled when you click on the map)</small>
+                            <input type="number" step="any" class="form-control" id="modalLongitude" name="longitude" placeholder="e.g. 77.5946">
+                            <small class="text-muted" style="font-size: 0.75rem;">(Auto-filled via search or map click)</small>
                         </div>
+
+                        <!-- Date, Target Capacity, Status -->
                         <div class="col-12 col-md-4">
                             <label class="form-label fw-semibold">Date <span class="text-danger">*</span></label>
                             <input type="date" class="form-control" name="date" required value="{{ today_str }}">
@@ -201,15 +364,24 @@
 {% endblock %}
 
 {% block scripts %}
+<!-- Leaflet Routing Machine JS -->
+<script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.min.js"></script>
+
 <script>
 let campMap;
 let activeMarkers = [];
+let routingControl = null;
+let userLiveMarker = null;
+let currentCustomPin = null;
+let searchDebounceTimer = null;
+
+// Default India center coordinates
+const INDIA_CENTER = [20.5937, 78.9629];
+const BENGALURU_COORDS = [12.9716, 77.5946];
 
 document.addEventListener('DOMContentLoaded', function () {
-    // 1. Initialize Leaflet Map
-    const defaultLat = 21.1458;
-    const defaultLng = 79.0882;
-    campMap = L.map('campMap').setView([defaultLat, defaultLng], 12);
+    // 1. Initialize Map defaulting to India view
+    campMap = L.map('campMap').setView(INDIA_CENTER, 5);
 
     // 2. OpenStreetMap Tile Layer
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -225,11 +397,16 @@ document.addEventListener('DOMContentLoaded', function () {
         if (camp.latitude && camp.longitude) {
             const marker = L.marker([camp.latitude, camp.longitude]).addTo(campMap);
             const popupContent = `
-                <div style="font-family: sans-serif; min-width: 180px;">
+                <div style="font-family: sans-serif; min-width: 220px;">
                     <div style="font-weight: bold; color: #1e3a8a; font-size: 14px; margin-bottom: 4px;">${camp.title}</div>
                     <div style="font-size: 12px; color: #4b5563; margin-bottom: 4px;">📍 ${camp.location_name}</div>
-                    <div style="font-size: 11px; color: #6b7280;">📅 ${camp.date} &bull; Target: ${camp.target_beneficiaries}</div>
-                    <div style="margin-top: 6px;"><span style="font-size: 10px; padding: 2px 8px; border-radius: 9999px; background: #e0f2fe; color: #0369a1; font-weight: 600;">${camp.status}</span></div>
+                    <div style="font-size: 11px; color: #6b7280; margin-bottom: 6px;">📅 ${camp.date} &bull; Capacity: ${camp.target_beneficiaries}</div>
+                    <div class="d-flex align-items-center gap-1 mb-2">
+                        <span style="font-size: 10px; padding: 2px 8px; border-radius: 9999px; background: #e0f2fe; color: #0369a1; font-weight: 600;">${camp.status}</span>
+                    </div>
+                    <button class="btn btn-warning btn-sm w-100 fw-bold py-1 px-2 text-dark shadow-sm" style="font-size: 11px;" onclick="getLiveRouteToCamp(${camp.latitude}, ${camp.longitude}, '${camp.title.replace(/'/g, "\\'")}', '${camp.location_name.replace(/'/g, "\\'")}')">
+                        <i class="fa-solid fa-route me-1"></i> Show Route from My Location
+                    </button>
                 </div>
             `;
             marker.bindPopup(popupContent);
@@ -239,39 +416,306 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     if (bounds.length > 0) {
-        campMap.fitBounds(bounds, { padding: [40, 40], maxZoom: 14 });
+        campMap.fitBounds(bounds, { padding: [50, 50], maxZoom: 14 });
     }
 
-    // 4. Map Click Handler: captures Coordinates for the Modal Form
+    // 4. Map Click Handler: drops draggable pin & populates modal coordinates
     campMap.on('click', function (e) {
-        const lat = e.latlng.lat.toFixed(6);
-        const lng = e.latlng.lng.toFixed(6);
+        const lat = parseFloat(e.latlng.lat.toFixed(6));
+        const lng = parseFloat(e.latlng.lng.toFixed(6));
 
-        document.getElementById('modalLatitude').value = lat;
-        document.getElementById('modalLongitude').value = lng;
-
-        L.popup()
-            .setLatLng(e.latlng)
-            .setContent(`
-                <div style="font-size: 12px; text-align: center;">
-                    <b>Selected Coordinates:</b><br/>Lat: ${lat}, Lng: ${lng}<br/>
-                    <button class="btn btn-primary btn-sm mt-2 py-0 px-2" style="font-size: 11px;" data-bs-toggle="modal" data-bs-target="#scheduleCampModal">
-                        Schedule Camp Here
-                    </button>
-                </div>
-            `)
-            .openOn(campMap);
+        setCampPin(lat, lng, "Selected Location");
     });
 });
 
-function focusCampOnMap(lat, lng, title) {
+// Set / Move Draggable Pin
+function setCampPin(lat, lng, label) {
+    document.getElementById('modalLatitude').value = lat;
+    document.getElementById('modalLongitude').value = lng;
+
+    if (currentCustomPin) {
+        currentCustomPin.setLatLng([lat, lng]);
+    } else {
+        currentCustomPin = L.marker([lat, lng], { draggable: true }).addTo(campMap);
+        currentCustomPin.on('dragend', function (e) {
+            const pos = e.target.getLatLng();
+            const nlat = parseFloat(pos.lat.toFixed(6));
+            const nlng = parseFloat(pos.lng.toFixed(6));
+            document.getElementById('modalLatitude').value = nlat;
+            document.getElementById('modalLongitude').value = nlng;
+            reverseGeocode(nlat, nlng);
+        });
+    }
+
+    currentCustomPin.bindPopup(`
+        <div style="font-size: 12px; text-align: center;">
+            <b>${label}</b><br/>Lat: ${lat}, Lng: ${lng}<br/>
+            <button class="btn btn-primary btn-sm mt-2 py-0 px-2" style="font-size: 11px;" data-bs-toggle="modal" data-bs-target="#scheduleCampModal">
+                Schedule Camp Here
+            </button>
+        </div>
+    `).openPopup();
+}
+
+// Reverse Geocode helper
+function reverseGeocode(lat, lng) {
+    fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`)
+        .then(r => r.json())
+        .then(data => {
+            if (data && data.display_name) {
+                document.getElementById('modalLocationName').value = data.display_name;
+            }
+        })
+        .catch(err => console.warn("Reverse geocode notice:", err));
+}
+
+// Debounced OpenStreetMap Nominatim Search (filtered to India: countrycodes=in)
+function debounceNominatimSearch(query, boxId, isModal = false) {
+    clearTimeout(searchDebounceTimer);
+    const box = document.getElementById(boxId);
+    if (!query || query.trim().length < 2) {
+        box.style.display = 'none';
+        return;
+    }
+
+    searchDebounceTimer = setTimeout(() => {
+        const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&countrycodes=in&limit=6`;
+        fetch(url)
+            .then(res => res.json())
+            .then(data => {
+                box.innerHTML = '';
+                if (!data || data.length === 0) {
+                    box.innerHTML = '<div class="p-2 text-muted small">No Indian locations found.</div>';
+                    box.style.display = 'block';
+                    return;
+                }
+
+                data.forEach(item => {
+                    const div = document.createElement('div');
+                    div.className = 'suggestion-item';
+                    div.innerHTML = `<i class="fa-solid fa-location-dot text-danger me-1"></i> <strong>${item.name || item.display_name.split(',')[0]}</strong><br/><small class="text-muted">${item.display_name}</small>`;
+                    div.onclick = function () {
+                        const lat = parseFloat(item.lat);
+                        const lon = parseFloat(item.lon);
+                        box.style.display = 'none';
+
+                        // Fly to location with street zoom 16
+                        campMap.flyTo([lat, lon], 16, { duration: 1.5 });
+                        setCampPin(lat, lon, item.name || item.display_name.split(',')[0]);
+
+                        // Auto-fill form fields
+                        document.getElementById('modalLocationName').value = item.display_name;
+                        if (!isModal) {
+                            document.getElementById('mapSearchInput').value = item.display_name.split(',')[0];
+                        }
+                    };
+                    box.appendChild(div);
+                });
+                box.style.display = 'block';
+            })
+            .catch(err => {
+                console.error("Nominatim search error:", err);
+            });
+    }, 350);
+}
+
+function triggerSearch(inputId, boxId) {
+    const val = document.getElementById(inputId).value;
+    debounceNominatimSearch(val, boxId);
+}
+
+// Jump to city shortcut
+function jumpToCity(lat, lng, zoom, name) {
     if (campMap) {
-        campMap.setView([lat, lng], 15);
+        campMap.flyTo([lat, lng], zoom, { duration: 1.2 });
+    }
+}
+
+function focusCampOnMap(arg1, arg2, arg3) {
+    let lat, lng, title;
+    if (typeof arg1 === 'object' && arg1 !== null && arg1.dataset) {
+        lat = parseFloat(arg1.dataset.lat);
+        lng = parseFloat(arg1.dataset.lng);
+        title = arg1.dataset.title || 'Health Camp';
+    } else {
+        lat = parseFloat(arg1);
+        lng = parseFloat(arg2);
+        title = arg3 || 'Health Camp';
+    }
+    if (campMap) {
+        campMap.flyTo([lat, lng], 15, { duration: 1.2 });
         L.popup()
             .setLatLng([lat, lng])
             .setContent(`<div style="font-weight: bold; color: #1e3a8a;">${title}</div>`)
             .openOn(campMap);
     }
 }
+
+function handlePopupRouteClick(btn) {
+    const lat = parseFloat(btn.dataset.lat);
+    const lng = parseFloat(btn.dataset.lng);
+    const title = decodeURIComponent(btn.dataset.title || '');
+    const loc = decodeURIComponent(btn.dataset.location || '');
+    getLiveRouteToCamp(lat, lng, title, loc);
+}
+
+// Locate User's Live Position
+function locateUserPosition() {
+    if (!navigator.geolocation) {
+        alert("Geolocation is not supported by your browser.");
+        return;
+    }
+    navigator.geolocation.getCurrentPosition(
+        function (pos) {
+            const ulat = pos.coords.latitude;
+            const ulng = pos.coords.longitude;
+            setUserMarker(ulat, ulng);
+            campMap.flyTo([ulat, ulng], 15, { duration: 1.2 });
+        },
+        function (err) {
+            alert("Could not retrieve your live location: " + err.message);
+        },
+        { enableHighAccuracy: true }
+    );
+}
+
+function setUserMarker(lat, lng) {
+    if (userLiveMarker) {
+        userLiveMarker.setLatLng([lat, lng]);
+    } else {
+        const pulseIcon = L.divIcon({
+            className: 'user-pulse-marker',
+            iconSize: [18, 18],
+            iconAnchor: [9, 9]
+        });
+        userLiveMarker = L.marker([lat, lng], { icon: pulseIcon }).addTo(campMap);
+        userLiveMarker.bindPopup("<b>📍 Your Current Location</b>");
+    }
+}
+
+// ============================================================
+// RAPIDO-STYLE LIVE ROUTE & NAVIGATION DIRECTIONS (OSRM)
+// ============================================================
+function getLiveRouteToCamp(arg1, arg2, arg3, arg4) {
+    let campLat, campLng, campTitle, locationName;
+    if (typeof arg1 === 'object' && arg1 !== null && arg1.dataset) {
+        campLat = parseFloat(arg1.dataset.lat);
+        campLng = parseFloat(arg1.dataset.lng);
+        campTitle = arg1.dataset.title || 'Health Camp';
+        locationName = arg1.dataset.location || '';
+    } else {
+        campLat = parseFloat(arg1);
+        campLng = parseFloat(arg2);
+        campTitle = arg3 || 'Health Camp';
+        locationName = arg4 || '';
+    }
+    if (!navigator.geolocation) {
+        // Fallback default starting location if geolocation not supported (e.g. central area)
+        drawRapidoRoute(BENGALURU_COORDS[0], BENGALURU_COORDS[1], campLat, campLng, campTitle, locationName);
+        return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+        function (pos) {
+            const ulat = pos.coords.latitude;
+            const ulng = pos.coords.longitude;
+            drawRapidoRoute(ulat, ulng, campLat, campLng, campTitle, locationName);
+        },
+        function (err) {
+            console.warn("GPS access denied/unavailable, using proximate reference:", err);
+            // Graceful fallback starting point near camp
+            const fallbackLat = campLat - 0.04;
+            const fallbackLng = campLng - 0.04;
+            drawRapidoRoute(fallbackLat, fallbackLng, campLat, campLng, campTitle, locationName);
+        },
+        { enableHighAccuracy: true, timeout: 6000 }
+    );
+}
+
+function drawRapidoRoute(userLat, userLng, campLat, campLng, campTitle, locationName) {
+    setUserMarker(userLat, userLng);
+
+    // Remove existing route if any
+    if (routingControl) {
+        campMap.removeControl(routingControl);
+        routingControl = null;
+    }
+
+    // Initialize Leaflet Routing Machine with Rapido Glowing Line
+    routingControl = L.Routing.control({
+        waypoints: [
+            L.latLng(userLat, userLng),
+            L.latLng(campLat, campLng)
+        ],
+        router: L.Routing.osrmv1({
+            serviceUrl: 'https://router.project-osrm.org/route/v1'
+        }),
+        lineOptions: {
+            styles: [
+                { color: '#0f172a', opacity: 0.25, weight: 8 },
+                { color: '#f97316', opacity: 0.95, weight: 5 }, // Rapido Orange
+                { color: '#fed7aa', opacity: 1, weight: 2 }
+            ],
+            addWaypoints: false
+        },
+        show: false, // Hide default bulky text box, show modern floating card
+        addWaypoints: false,
+        draggableWaypoints: false,
+        fitSelectedRoutes: true
+    }).addTo(campMap);
+
+    routingControl.on('routesfound', function (e) {
+        const routes = e.routes;
+        if (routes && routes.length > 0) {
+            const summary = routes[0].summary;
+            const distKm = (summary.totalDistance / 1000).toFixed(1);
+            const timeMin = Math.round(summary.totalTime / 60);
+
+            // Update Floating Rapido Navigation Card
+            document.getElementById('routeDistanceText').innerText = distKm + " km";
+            document.getElementById('routeTimeText').innerText = timeMin + " mins";
+            document.getElementById('routeDestText').innerText = campTitle + " (" + locationName + ")";
+            
+            // External Google Maps Navigation link
+            const gmapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${userLat},${userLng}&destination=${campLat},${campLng}`;
+            document.getElementById('btnExternalGoogleMaps').href = gmapsUrl;
+
+            // Show floating card
+            document.getElementById('rapidoNavCard').style.display = 'block';
+        }
+    });
+
+    routingControl.on('routingerror', function (err) {
+        console.warn("OSRM routing notice:", err);
+        // Fallback: draw straight polyline
+        const straightDist = (L.latLng(userLat, userLng).distanceTo(L.latLng(campLat, campLng)) / 1000).toFixed(1);
+        document.getElementById('routeDistanceText').innerText = straightDist + " km";
+        document.getElementById('routeTimeText').innerText = Math.round(straightDist * 2.5) + " mins";
+        document.getElementById('routeDestText').innerText = campTitle + " (" + locationName + ")";
+        const gmapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${userLat},${userLng}&destination=${campLat},${campLng}`;
+        document.getElementById('btnExternalGoogleMaps').href = gmapsUrl;
+        document.getElementById('rapidoNavCard').style.display = 'block';
+    });
+}
+
+function clearLiveRoute() {
+    if (routingControl) {
+        campMap.removeControl(routingControl);
+        routingControl = null;
+    }
+    document.getElementById('rapidoNavCard').style.display = 'none';
+}
+
+// Close suggestion box on outside click
+document.addEventListener('click', function (e) {
+    const mapBox = document.getElementById('mapSearchSuggestions');
+    const modalBox = document.getElementById('modalSearchSuggestions');
+    if (mapBox && !e.target.closest('#mapSearchInput')) {
+        mapBox.style.display = 'none';
+    }
+    if (modalBox && !e.target.closest('#modalSearchInput')) {
+        modalBox.style.display = 'none';
+    }
+});
 </script>
 {% endblock %}

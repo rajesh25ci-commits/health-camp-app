@@ -34,6 +34,12 @@ from werkzeug.utils import secure_filename
 
 from config import Config
 from models import db, User, Patient, Doctor, Camp, Appointment, HealthRecord, Medicine
+from functools import wraps
+import random
+from email_service import send_otp_email
+from models import generate_10_digit_patient_id
+from flask import session
+
 from utils import (
     allowed_file,
     generate_qr_code,
@@ -86,7 +92,7 @@ def create_app(config_class=Config) -> Flask:
     with app.app_context():
         try:
             db.create_all()
-            init_medicine_inventory_seed(app)
+            # Database starts 100% clean - zero preloaded/dummy data
         except Exception as e:
             print(f"[WARN] Database initialization notice: {e}")
 
@@ -110,185 +116,567 @@ def create_app(config_class=Config) -> Flask:
     # Authentication & Root Routes
     # ==========================================
 
+
+    # ==========================================
+    # Role-Based Access Control (RBAC) Decorators
+    # ==========================================
+
+    def staff_only(f):
+        """Restricts route access to Doctors, Staff, Volunteers, Coordinators, and Admins."""
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            if not current_user.is_authenticated:
+                return redirect(url_for('login', portal='doctor', tab='signin'))
+            if current_user.is_patient():
+                flash('Access restricted to healthcare providers and camp staff.', 'warning')
+                return redirect(url_for('my_health_portal'))
+            return f(*args, **kwargs)
+        return decorated_function
+
+    def patient_only(f):
+        """Restricts route access exclusively to authenticated Patients."""
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            if not current_user.is_authenticated:
+                return redirect(url_for('login', portal='patient', tab='signin'))
+            if not current_user.is_patient():
+                flash('Clinical and administrative staff should use the Clinical Dashboard.', 'info')
+                return redirect(url_for('dashboard'))
+            return f(*args, **kwargs)
+        return decorated_function
+
+    # ==========================================
+    # Dual-Portal Authentication & Root Routes
+    # ==========================================
+
     @app.route('/')
     def index():
-        """Root landing route: redirects to dashboard if authenticated, else login."""
+        """Root landing route: redirects authenticated patients to /my-health-portal, staff to /dashboard, else login."""
         if current_user.is_authenticated:
+            if current_user.is_patient():
+                return redirect(url_for('my_health_portal'))
             return redirect(url_for('dashboard'))
-        return redirect(url_for('login'))
+        return redirect(url_for('login', portal='patient', tab='signin'))
 
     @app.route('/login', methods=['GET', 'POST'])
     def login():
         """
-        Cinematic User Login and Self-Service Portal Handler.
-        Supports:
-        - Staff Sign In (username/email + custom password)
-        - Self-Service Account Creation / Custom Password Setup (via action='setup')
-        - Self-Service Password Reset (via action='reset')
+        Dual-Portal Unified Authentication Gateway.
+        Supports Patient Portal and Doctor Portal navigation tabs.
         """
         if current_user.is_authenticated:
+            if current_user.is_patient():
+                return redirect(url_for('my_health_portal'))
             return redirect(url_for('dashboard'))
 
-        active_tab = request.args.get('tab', 'login')
+        portal = request.args.get('portal', 'patient').strip().lower()
+        tab = request.args.get('tab', 'signin').strip().lower()
 
         if request.method == 'POST':
-            action = request.form.get('action', 'login')
-            if action == 'setup':
-                return setup_account()
-            elif action == 'reset':
-                return reset_password()
-
-            username = request.form.get('username', '').strip()
-            password = request.form.get('password', '').strip()
-            remember = True if request.form.get('remember') else False
-
-            if not username or not password:
-                flash('Please enter both your Username and Password.', 'danger')
-                return render_template('login.html', active_tab='login')
-
-            user = User.query.filter(func.lower(User.username) == username.lower()).first()
-
-            if user and user.check_password(password):
-                login_user(user, remember=remember)
-                display_name = user.full_name or user.username
-                flash(f'Welcome back, {display_name}! Signed in as {user.role}.', 'success')
-                next_page = request.args.get('next')
-                return redirect(next_page or url_for('dashboard'))
+            # Support backwards compatible direct login POST
+            portal_hint = request.form.get('portal', portal).strip().lower()
+            if portal_hint == 'doctor':
+                return doctor_login()
             else:
-                flash('Invalid username or password. Please verify credentials or set up a new account.', 'danger')
-                return render_template('login.html', active_tab='login')
+                return patient_login()
 
-        return render_template('login.html', active_tab=active_tab)
+        return render_template('login.html', portal=portal, tab=tab)
 
-    @app.route('/auth/setup-account', methods=['POST'])
-    def setup_account():
+    # -------------------------------------------------------------
+    # PATIENT PORTAL ROUTES
+    # -------------------------------------------------------------
+
+    @app.route('/patient/signup', methods=['POST'])
+    def patient_signup():
         """
-        Self-Service Account Creation and Custom Password Setup.
-        Validates Camp Access PIN (CAMP_ACCESS_PIN), sets up user with custom password,
-        hashes with Werkzeug PBKDF2/scrypt, and logs the user in immediately.
+        Patient Registration with Calendar DOB, cascading location, blood group, allergies,
+        and mandatory 6-digit Gmail OTP verification.
         """
         if current_user.is_authenticated:
-            return redirect(url_for('dashboard'))
+            return redirect(url_for('my_health_portal'))
 
-        full_name = request.form.get('full_name', '').strip()
-        username = request.form.get('username', '').strip().lower()
-        role = request.form.get('role', 'Volunteer').strip()
-        camp_pin = request.form.get('camp_pin', '').strip()
+        first_name = request.form.get('first_name', '').strip()
+        last_name = request.form.get('last_name', '').strip()
+        dob_raw = request.form.get('dob', '').strip()
+        age_raw = request.form.get('age', '').strip()
+        gender = request.form.get('gender', 'Other').strip()
+        blood_group = request.form.get('blood_group', '').strip()
+        allergies = request.form.get('allergies', '').strip()
+        phone = request.form.get('phone', '').strip()
+        country = request.form.get('country', 'India').strip()
+        state = request.form.get('state', '').strip()
+        city = request.form.get('city', '').strip()
+        address = request.form.get('address', '').strip()
+        email = request.form.get('email', '').strip().lower()
         password = request.form.get('password', '').strip()
         confirm_password = request.form.get('confirm_password', '').strip()
 
-        expected_pin = os.environ.get('CAMP_ACCESS_PIN', 'HEALTH2026').strip()
-
-        if not username or not password:
-            flash('Username and Password are required to set up your account.', 'danger')
-            return redirect(url_for('login', tab='setup'))
-
-        # Security PIN Verification
-        if camp_pin != expected_pin:
-            flash('Invalid Camp Access PIN! Please enter the authorized PIN (default: HEALTH2026) provided by your camp coordinator.', 'danger')
-            return redirect(url_for('login', tab='setup'))
+        if not first_name or not email or not password:
+            flash('First Name, Email, and Password are required fields.', 'danger')
+            return redirect(url_for('login', portal='patient', tab='signup'))
 
         if len(password) < 6:
             flash('Password must be at least 6 characters long.', 'danger')
-            return redirect(url_for('login', tab='setup'))
+            return redirect(url_for('login', portal='patient', tab='signup'))
 
         if password != confirm_password:
-            flash('Passwords do not match. Please verify and re-type your password.', 'danger')
-            return redirect(url_for('login', tab='setup'))
+            flash('Passwords do not match. Please verify and re-enter.', 'danger')
+            return redirect(url_for('login', portal='patient', tab='signup'))
 
-        # Check existing username
-        existing_user = User.query.filter(func.lower(User.username) == username.lower()).first()
+        # Calculate Age from Date of Birth
+        calculated_age = 25
+        dob_date = None
+        if dob_raw:
+            try:
+                dob_date = datetime.strptime(dob_raw, '%Y-%m-%d').date()
+                today = date.today()
+                calculated_age = today.year - dob_date.year - ((today.month, today.day) < (dob_date.month, dob_date.day))
+            except Exception:
+                calculated_age = int(age_raw) if age_raw.isdigit() else 25
+        elif age_raw.isdigit():
+            calculated_age = int(age_raw)
+
+        # Check existing user
+        existing_user = User.query.filter(
+            (func.lower(User.email) == email) | (func.lower(User.username) == email)
+        ).first()
+
         if existing_user:
-            flash(f'Username "{username}" is already in use. Please sign in or use the Reset Password tab.', 'warning')
-            return redirect(url_for('login', tab='login'))
+            if not existing_user.is_email_verified:
+                session['pending_verification_email'] = email
+                flash('An account with this email already exists but is unverified. Please enter your verification OTP.', 'warning')
+                return redirect(url_for('verify_email', email=email))
+            flash('An account with this email address already exists. Please sign in.', 'info')
+            return redirect(url_for('login', portal='patient', tab='signin'))
 
-        valid_roles = ['Doctor', 'Volunteer', 'Coordinator', 'Admin']
-        if role not in valid_roles:
-            role = 'Volunteer'
+        # Generate unique 10-digit Patient numeric ID
+        ten_digit_id = generate_10_digit_patient_id()
+
+        # Create Patient Demographic Record
+        patient = Patient(
+            patient_uid=ten_digit_id,
+            first_name=first_name,
+            last_name=last_name,
+            name=f"{first_name} {last_name}".strip(),
+            dob=dob_date,
+            age=calculated_age,
+            gender=gender,
+            blood_group=blood_group,
+            allergies=allergies,
+            phone=phone,
+            country=country or 'India',
+            state=state,
+            city=city,
+            address=address,
+            email=email,
+            urgency_level='NORMAL'
+        )
+        db.session.add(patient)
+        db.session.flush()
+
+        # Generate rich smartphone-scannable QR pass encoding
+        try:
+            generate_qr_code(patient.patient_uid, app.config['QRCODE_FOLDER'], patient=patient)
+        except Exception as e:
+            print(f"[WARN] QR Generation notice: {e}")
+
+        # Generate 6-digit OTP
+        otp_code = f"{random.randint(100000, 999999)}"
 
         new_user = User(
-            username=username,
-            full_name=full_name or username.title(),
-            role=role
+            username=email,
+            email=email,
+            full_name=f"{first_name} {last_name}".strip(),
+            role='Patient',
+            phone=phone,
+            patient_id=patient.id,
+            is_email_verified=False,
+            verification_otp=otp_code,
+            otp_created_at=datetime.utcnow()
         )
         new_user.set_password(password)
 
         db.session.add(new_user)
         db.session.commit()
 
-        # If role is Doctor, link to Doctor directory if not already present
-        if role == 'Doctor' and new_user.full_name:
-            doc = Doctor.query.filter(func.lower(Doctor.name) == new_user.full_name.lower()).first()
-            if not doc:
-                doc = Doctor(
-                    name=new_user.full_name,
-                    specialization='General Medicine',
-                    phone='',
-                    email='',
-                    availability='Available'
-                )
-                db.session.add(doc)
-                db.session.commit()
+        # Dispatch OTP via SMTP (with demo-mode fallback)
+        email_sent, sent_msg = send_otp_email(email, otp_code, new_user.full_name)
+        session['pending_verification_email'] = email
 
-        # Automatically log the user in immediately after setting their password
-        login_user(new_user, remember=True)
-        display_name = new_user.full_name or new_user.username
-        flash(f'Welcome to Smart Health Camp, {display_name}! Your {new_user.role} account and secure password are now active.', 'success')
-        return redirect(url_for('dashboard'))
+        if email_sent:
+            flash(f'Verification code sent to {email}. Please enter the 6-digit OTP below to activate your account.', 'success')
+        else:
+            flash(f'Account created! (Demo Verification Code: {otp_code}). Please enter the 6-digit OTP below to verify your email.', 'info')
 
-    @app.route('/auth/reset-password', methods=['POST'])
-    def reset_password():
+        return redirect(url_for('verify_email', email=email))
+
+    @app.route('/verify-email', methods=['GET', 'POST'])
+    def verify_email():
         """
-        Self-Service Custom Password Reset.
-        Requires Username and Camp Access PIN to securely set a new password.
-        Hashes password with Werkzeug and logs the user in immediately.
+        Email OTP Verification Route.
+        Verifies 6-digit code sent to user Gmail and activates patient account.
+        """
+        target_email = request.args.get('email', '').strip().lower() or session.get('pending_verification_email', '').strip().lower()
+
+        user = None
+        if target_email:
+            user = User.query.filter(func.lower(User.email) == target_email).first()
+
+        if request.method == 'POST':
+            submitted_email = request.form.get('email', '').strip().lower()
+            submitted_otp = request.form.get('otp', '').strip()
+
+            if not submitted_email or not submitted_otp:
+                flash('Please provide both your registered email and the 6-digit OTP.', 'danger')
+                return render_template('verify_email.html', email=submitted_email, demo_otp=getattr(user, 'verification_otp', None))
+
+            v_user = User.query.filter(func.lower(User.email) == submitted_email).first()
+            if not v_user:
+                flash('Account not found with this email. Please sign up first.', 'danger')
+                return redirect(url_for('login', portal='patient', tab='signup'))
+
+            if v_user.is_email_verified:
+                flash('Your email is already verified! Please sign in.', 'success')
+                return redirect(url_for('login', portal='patient', tab='signin'))
+
+            if not v_user.verification_otp or v_user.verification_otp.strip() != submitted_otp:
+                flash('Invalid or expired verification code. Please check the OTP and try again.', 'danger')
+                return render_template('verify_email.html', email=submitted_email, demo_otp=v_user.verification_otp)
+
+            # Verification successful
+            v_user.is_email_verified = True
+            v_user.verification_otp = None
+            db.session.commit()
+
+            session.pop('pending_verification_email', None)
+            flash(f'Email verified successfully! Welcome, {v_user.full_name or "Patient"}. Please sign in to access your digital health portal.', 'success')
+            return redirect(url_for('login', portal='patient', tab='signin'))
+
+        demo_code = user.verification_otp if user and not user.is_email_verified else None
+        return render_template('verify_email.html', email=target_email, demo_otp=demo_code)
+
+    @app.route('/resend-otp')
+    def resend_otp():
+        """Regenerate and resend 6-digit verification OTP."""
+        target_email = request.args.get('email', '').strip().lower() or session.get('pending_verification_email', '').strip().lower()
+        if not target_email:
+            flash('No pending verification email found. Please register or sign in.', 'warning')
+            return redirect(url_for('login', portal='patient', tab='signup'))
+
+        user = User.query.filter(func.lower(User.email) == target_email).first()
+        if not user:
+            flash('Account not found with this email.', 'danger')
+            return redirect(url_for('login', portal='patient', tab='signup'))
+
+        if user.is_email_verified:
+            flash('This account is already verified! Please sign in.', 'info')
+            return redirect(url_for('login', portal='patient', tab='signin'))
+
+        new_otp = f"{random.randint(100000, 999999)}"
+        user.verification_otp = new_otp
+        user.otp_created_at = datetime.utcnow()
+        db.session.commit()
+
+        email_sent, _ = send_otp_email(user.email, new_otp, user.full_name)
+        session['pending_verification_email'] = user.email
+
+        if email_sent:
+            flash(f'A fresh verification code has been dispatched to {user.email}.', 'success')
+        else:
+            flash(f'New verification code generated! (Demo Code: {new_otp})', 'info')
+
+        return redirect(url_for('verify_email', email=user.email))
+
+    @app.route('/patient/login', methods=['POST'])
+    def patient_login():
+        """
+        Patient Sign In Handler.
+        Enforces email verification, guarantees unique 10-digit ID and smartphone-scannable QR pass,
+        and securely routes to /my-health-portal.
+        """
+        email = request.form.get('email', '').strip().lower()
+        password = request.form.get('password', '').strip()
+        remember = True if request.form.get('remember') else False
+
+        if not email or not password:
+            flash('Please enter both your Email and Password.', 'danger')
+            return redirect(url_for('login', portal='patient', tab='signin'))
+
+        user = User.query.filter(
+            (func.lower(User.email) == email) | (func.lower(User.username) == email)
+        ).first()
+
+        if not user or not user.check_password(password):
+            flash('Invalid email or password. Please verify credentials.', 'danger')
+            return redirect(url_for('login', portal='patient', tab='signin'))
+
+        if user.role != 'Patient':
+            flash(f'This account is registered as {user.role}. Please sign in via the Doctor & Staff Portal.', 'info')
+            return redirect(url_for('login', portal='doctor', tab='signin'))
+
+        if not user.is_email_verified:
+            session['pending_verification_email'] = user.email
+            flash('Please verify your email address with the 6-digit OTP before signing in.', 'warning')
+            return redirect(url_for('verify_email', email=user.email))
+
+        # Ensure linked Patient record exists
+        patient = user.patient_record
+        if not patient and user.patient_id:
+            patient = db.session.get(Patient, user.patient_id)
+
+        if not patient:
+            # Auto-create patient record if missing
+            ten_digit_id = generate_10_digit_patient_id()
+            patient = Patient(
+                patient_uid=ten_digit_id,
+                name=user.full_name or user.username,
+                email=user.email,
+                phone=user.phone or '',
+                urgency_level='NORMAL'
+            )
+            db.session.add(patient)
+            db.session.flush()
+            user.patient_id = patient.id
+            db.session.commit()
+
+        # Guarantee unique 10-digit numeric ID & smartphone QR pass
+        if not patient.patient_uid or not (len(str(patient.patient_uid)) == 10 and str(patient.patient_uid).isdigit()):
+            patient.patient_uid = generate_10_digit_patient_id()
+            db.session.commit()
+
+        try:
+            generate_qr_code(patient.patient_uid, app.config['QRCODE_FOLDER'], patient=patient)
+        except Exception as e:
+            print(f"[WARN] QR Generation error: {e}")
+
+        login_user(user, remember=remember)
+        display_name = patient.display_name or user.full_name or "Beneficiary"
+        flash(f'Welcome back, {display_name}! Your Digital Health Portal is active.', 'success')
+        return redirect(url_for('my_health_portal'))
+
+    # -------------------------------------------------------------
+    # DOCTOR & STAFF PORTAL ROUTES (NO PIN REQUIRED)
+    # -------------------------------------------------------------
+
+    @app.route('/doctor/signup', methods=['POST'])
+    def doctor_signup():
+        """
+        Doctor / Clinical Staff Registration.
+        Captures full credentials with NO PIN requirement. Automatically activates account.
         """
         if current_user.is_authenticated:
             return redirect(url_for('dashboard'))
 
-        username = request.form.get('username', '').strip().lower()
-        camp_pin = request.form.get('camp_pin', '').strip()
-        new_password = request.form.get('new_password', '').strip()
+        full_name = request.form.get('full_name', '').strip()
+        license_number = request.form.get('license_number', '').strip()
+        specialization = request.form.get('specialization', 'General Medicine').strip()
+        qualification = request.form.get('qualification', 'MBBS').strip()
+        phone = request.form.get('phone', '').strip()
+        email = request.form.get('email', '').strip().lower()
+        password = request.form.get('password', '').strip()
         confirm_password = request.form.get('confirm_password', '').strip()
 
-        expected_pin = os.environ.get('CAMP_ACCESS_PIN', 'HEALTH2026').strip()
+        if not full_name or not email or not password:
+            flash('Doctor Full Name, Email, and Password are required.', 'danger')
+            return redirect(url_for('login', portal='doctor', tab='signup'))
 
-        if not username or not new_password:
-            flash('Username and New Password are required.', 'danger')
-            return redirect(url_for('login', tab='reset'))
+        if len(password) < 6:
+            flash('Password must be at least 6 characters long.', 'danger')
+            return redirect(url_for('login', portal='doctor', tab='signup'))
 
-        if camp_pin != expected_pin:
-            flash('Invalid Camp Access PIN! Authorization required to set a new password.', 'danger')
-            return redirect(url_for('login', tab='reset'))
+        if password != confirm_password:
+            flash('Passwords do not match. Please verify and re-enter.', 'danger')
+            return redirect(url_for('login', portal='doctor', tab='signup'))
 
-        if len(new_password) < 6:
-            flash('New password must be at least 6 characters long.', 'danger')
-            return redirect(url_for('login', tab='reset'))
+        existing_user = User.query.filter(
+            (func.lower(User.email) == email) | (func.lower(User.username) == email)
+        ).first()
 
-        if new_password != confirm_password:
-            flash('New passwords do not match. Please verify and re-type.', 'danger')
-            return redirect(url_for('login', tab='reset'))
+        if existing_user:
+            flash('An account with this email address already exists. Please sign in.', 'warning')
+            return redirect(url_for('login', portal='doctor', tab='signin'))
 
-        user = User.query.filter(func.lower(User.username) == username.lower()).first()
-        if not user:
-            flash(f'User "{username}" was not found in the health camp registry.', 'danger')
-            return redirect(url_for('login', tab='reset'))
+        # Create Doctor Record
+        doc = Doctor(
+            name=full_name,
+            specialization=specialization or 'General Medicine',
+            phone=phone,
+            email=email,
+            qualification=qualification,
+            license_number=license_number,
+            availability='Available'
+        )
+        db.session.add(doc)
+        db.session.flush()
 
-        user.set_password(new_password)
+        # Create Doctor User (Verified by default)
+        new_doc_user = User(
+            username=email,
+            email=email,
+            full_name=full_name,
+            role='Doctor',
+            phone=phone,
+            specialization=specialization,
+            qualification=qualification,
+            license_number=license_number,
+            is_email_verified=True
+        )
+        new_doc_user.set_password(password)
+
+        db.session.add(new_doc_user)
         db.session.commit()
 
-        login_user(user, remember=True)
-        display_name = user.full_name or user.username
-        flash(f'Password updated successfully for {display_name}! You are now signed in as {user.role}.', 'success')
+        login_user(new_doc_user, remember=True)
+        flash(f'Welcome, Dr. {full_name}! Your Doctor account is now active with full clinical access.', 'success')
         return redirect(url_for('dashboard'))
+
+    @app.route('/doctor/login', methods=['POST'])
+    def doctor_login():
+        """
+        Doctor & Healthcare Staff Sign In Handler.
+        Opens full clinical dashboard with patient search, triage, prescriptions, and analytics.
+        """
+        username_or_email = request.form.get('username', '').strip().lower()
+        password = request.form.get('password', '').strip()
+        remember = True if request.form.get('remember') else False
+
+        if not username_or_email or not password:
+            flash('Please enter your Medical Email/Username and Password.', 'danger')
+            return redirect(url_for('login', portal='doctor', tab='signin'))
+
+        user = User.query.filter(
+            (func.lower(User.username) == username_or_email) | (func.lower(User.email) == username_or_email)
+        ).first()
+
+        if not user or not user.check_password(password):
+            flash('Invalid doctor credentials. Please check your credentials and try again.', 'danger')
+            return redirect(url_for('login', portal='doctor', tab='signin'))
+
+        if user.is_patient():
+            flash('This is the Doctor & Staff Portal. Please sign in through the Patient Portal.', 'warning')
+            return redirect(url_for('login', portal='patient', tab='signin'))
+
+        login_user(user, remember=remember)
+        display_name = user.full_name or user.username
+        flash(f'Welcome back, Dr. {display_name}! Clinical Dashboard active.', 'success')
+        return redirect(url_for('dashboard'))
+
+    # -------------------------------------------------------------
+    # PATIENT HEALTH PORTAL & EMERGENCY DIGITAL PASS
+    # -------------------------------------------------------------
+
+    @app.route('/my-health-portal')
+    @login_required
+    @patient_only
+    def my_health_portal():
+        """
+        Dedicated Single-User Patient Health Portal with strict data isolation.
+        Patients can ONLY view their own records, 10-digit ID, scannable QR pass,
+        vitals, prescriptions, Indian diet plans, and AI assistant.
+        """
+        patient = current_user.patient_record
+        if not patient and current_user.patient_id:
+            patient = db.session.get(Patient, current_user.patient_id)
+
+        if not patient:
+            flash('Patient demographic profile not found. Please contact camp coordinator.', 'danger')
+            return redirect(url_for('logout'))
+
+        # Ensure guaranteed unique 10-digit numeric ID & smartphone QR pass
+        if not patient.patient_uid or not (len(str(patient.patient_uid)) == 10 and str(patient.patient_uid).isdigit()):
+            patient.patient_uid = generate_10_digit_patient_id()
+            db.session.commit()
+
+        qr_path = os.path.join(app.config['QRCODE_FOLDER'], f"patient_{patient.patient_uid}.png")
+        if not os.path.exists(qr_path):
+            generate_qr_code(patient.patient_uid, app.config['QRCODE_FOLDER'], patient=patient)
+
+        # Strictly fetch this patient's records
+        records = HealthRecord.query.filter_by(patient_id=patient.id).order_by(HealthRecord.created_at.desc()).all()
+        latest_record = records[0] if records else None
+        ambulance_log = AmbulanceDispatchLog.query.filter_by(patient_id=patient.id).order_by(AmbulanceDispatchLog.dispatched_at.desc()).first()
+
+        # Clinical aids
+        prescription_text = getattr(latest_record, 'prescription', '') or ''
+        diag_text = getattr(latest_record, 'diagnosis', '') or ''
+        vitals_text = f"BP: {getattr(latest_record, 'systolic_bp', '')}/{getattr(latest_record, 'diastolic_bp', '')}, SpO2: {getattr(latest_record, 'spo2', '')}%" if latest_record and getattr(latest_record, 'systolic_bp', None) else ""
+
+        diet_plan = recommend_diet_plan(diag_text, vitals_text, systolic=getattr(latest_record, 'systolic_bp', None), rbs=getattr(latest_record, 'blood_sugar', None))
+        med_schedule = build_medicine_schedule_sms(patient, prescription_text, save_to_db=False)
+        wellness = calculate_patient_wellness_score(patient, latest_record)
+        journey_steps = get_patient_journey_steps(patient, latest_record)
+        symptom_schedule = get_symptom_based_prescription(getattr(patient, 'symptoms', ''), patient.age or 30, getattr(patient, 'urgency_level', 'NORMAL'))
+
+        # Photo URL
+        photo_url = None
+        if patient.photo_filename:
+            full_path = os.path.join(app.config['UPLOAD_FOLDER'], patient.photo_filename)
+            if os.path.exists(full_path):
+                photo_url = url_for('static', filename=f'uploads/{patient.photo_filename}')
+        if not photo_url:
+            photo_url = url_for('static', filename='uploads/default_avatar.png')
+
+        verification_url = url_for('verify_pass', patient_uid=patient.patient_uid, _external=True)
+
+        return render_template(
+            'my_health_portal.html',
+            patient=patient,
+            records=records,
+            latest_record=latest_record,
+            photo_url=photo_url,
+            verification_url=verification_url,
+            diet_plan=diet_plan,
+            med_schedule=med_schedule,
+            whatsapp_url=med_schedule.get('whatsapp_url', '#'),
+            ambulance_log=ambulance_log,
+            wellness=wellness,
+            journey_steps=journey_steps,
+            symptom_schedule=symptom_schedule
+        )
+
+    @app.route('/verify-pass/<patient_uid>')
+    def verify_pass(patient_uid):
+        """
+        Public Emergency Digital Health Pass Verification View.
+        Scanned via smartphone cameras: shows verified badge, 10-digit ID, patient identity,
+        blood group, allergies warning, and emergency contacts while keeping clinical notes private.
+        """
+        cleaned_uid = str(patient_uid).strip()
+        patient = Patient.query.filter(Patient.patient_uid.ilike(cleaned_uid)).first()
+
+        if not patient and cleaned_uid.isdigit():
+            patient = db.session.get(Patient, int(cleaned_uid))
+
+        if not patient:
+            flash('Invalid or unrecognized Health Pass QR Code.', 'danger')
+            return render_template('patient_not_found.html', patient_id=patient_uid), 404
+
+        photo_url = None
+        if patient.photo_filename:
+            full_path = os.path.join(app.config['UPLOAD_FOLDER'], patient.photo_filename)
+            if os.path.exists(full_path):
+                photo_url = url_for('static', filename=f'uploads/{patient.photo_filename}')
+        if not photo_url:
+            photo_url = url_for('static', filename='uploads/default_avatar.png')
+
+        return render_template(
+            'verify_pass.html',
+            patient=patient,
+            photo_url=photo_url
+        )
+
 
     @app.route('/logout')
     @login_required
     def logout():
         """Sign out the currently authenticated user."""
+        is_pt = current_user.is_patient()
         logout_user()
         flash('You have been successfully logged out.', 'info')
-        return redirect(url_for('login'))
+        if is_pt:
+            return redirect(url_for('login', portal='patient', tab='signin'))
+        return redirect(url_for('login', portal='doctor', tab='signin'))
+
 
     # ==========================================
     # Dashboard & Visual Analytics (Chart.js)
@@ -296,6 +684,7 @@ def create_app(config_class=Config) -> Flask:
 
     @app.route('/dashboard')
     @login_required
+    @staff_only
     def dashboard():
         """
         Executive overview dashboard with top metric cards, stock alerts,
@@ -358,6 +747,7 @@ def create_app(config_class=Config) -> Flask:
 
     @app.route('/patients')
     @login_required
+    @staff_only
     def patients():
         """Patient directory with search query and demographic filters."""
         search = request.args.get('search', '').strip()
@@ -386,6 +776,7 @@ def create_app(config_class=Config) -> Flask:
 
     @app.route('/patient/add', methods=['POST'])
     @login_required
+    @staff_only
     def patient_add():
         """
         Register a new patient, handle photo upload to static/uploads/,
@@ -544,6 +935,22 @@ def create_app(config_class=Config) -> Flask:
             flash(f'Patient record "{target_id}" was not found in our community health camp database.', 'danger')
             return render_template('patient_not_found.html', patient_id=target_id), 404
 
+        # Strict Patient Data Isolation Check
+        if current_user.is_authenticated and current_user.is_patient():
+            user_pid = current_user.patient_id
+            user_puid = getattr(current_user.patient_record, 'patient_uid', '')
+            if patient.id != user_pid and patient.patient_uid != user_puid:
+                flash('Access denied. You can only view your own medical profile.', 'danger')
+                return redirect(url_for('my_health_portal'))
+
+        # Strict Patient Data Isolation Check
+        if current_user.is_authenticated and current_user.is_patient():
+            user_pid = current_user.patient_id
+            user_puid = getattr(current_user.patient_record, 'patient_uid', '')
+            if patient.id != user_pid and patient.patient_uid != user_puid:
+                flash('Access denied. You can only view your own digital health card.', 'danger')
+                return redirect(url_for('my_health_portal'))
+
         # Fetch latest clinical consultation record
         latest_record = HealthRecord.query.filter_by(patient_id=patient.id).order_by(HealthRecord.created_at.desc()).first()
 
@@ -612,6 +1019,22 @@ def create_app(config_class=Config) -> Flask:
             flash(f'Patient record "{target_id}" was not found in our community health camp database.', 'danger')
             return render_template('patient_not_found.html', patient_id=target_id), 404
 
+        # Strict Patient Data Isolation Check
+        if current_user.is_authenticated and current_user.is_patient():
+            user_pid = current_user.patient_id
+            user_puid = getattr(current_user.patient_record, 'patient_uid', '')
+            if patient.id != user_pid and patient.patient_uid != user_puid:
+                flash('Access denied. You can only view your own medical profile.', 'danger')
+                return redirect(url_for('my_health_portal'))
+
+        # Strict Patient Data Isolation Check
+        if current_user.is_authenticated and current_user.is_patient():
+            user_pid = current_user.patient_id
+            user_puid = getattr(current_user.patient_record, 'patient_uid', '')
+            if patient.id != user_pid and patient.patient_uid != user_puid:
+                flash('Access denied. You can only view your own digital health card.', 'danger')
+                return redirect(url_for('my_health_portal'))
+
         profile_url = url_for('patient_detail', patient_id=patient.patient_uid, _external=True)
         latest_record = HealthRecord.query.filter_by(patient_id=patient.id).order_by(HealthRecord.created_at.desc()).first()
         prescription_text = getattr(latest_record, 'prescription', '') or ''
@@ -660,6 +1083,14 @@ def create_app(config_class=Config) -> Flask:
             flash('Patient not found.', 'danger')
             return redirect(url_for('patients'))
 
+        # Strict Patient Data Isolation Check
+        if current_user.is_authenticated and current_user.is_patient():
+            user_pid = current_user.patient_id
+            user_puid = getattr(current_user.patient_record, 'patient_uid', '')
+            if patient.id != user_pid and patient.patient_uid != user_puid:
+                flash('Access denied. You can only download your own medical PDF pass.', 'danger')
+                return redirect(url_for('my_health_portal'))
+
         records = getattr(patient, 'health_records', [])
         pdf_buffer = generate_patient_pdf(patient, records)
         safe_uid = getattr(patient, 'patient_uid', getattr(patient, 'patient_id', f'PAT-{patient.id}'))
@@ -686,6 +1117,7 @@ def create_app(config_class=Config) -> Flask:
 
     @app.route('/camp_report/<int:camp_id>')
     @login_required
+    @staff_only
     def camp_report(camp_id):
         """Generate and stream health camp report PDF."""
         camp = db.session.get(Camp, camp_id)
@@ -705,6 +1137,7 @@ def create_app(config_class=Config) -> Flask:
     @app.route('/patient/<patient_id>/delete', methods=['POST'])
     @app.route('/patient/<int:id>/delete', methods=['POST'])
     @login_required
+    @staff_only
     def patient_delete(patient_id=None, id=None):
         """Delete patient and associated health records."""
         target_id = patient_id if patient_id is not None else id
@@ -744,6 +1177,7 @@ def create_app(config_class=Config) -> Flask:
 
     @app.route('/camps')
     @login_required
+    @staff_only
     def camps():
         """Interactive Leaflet.js health camp operations and geo-map view."""
         camps_list = Camp.query.order_by(Camp.date.asc()).all()
@@ -753,6 +1187,7 @@ def create_app(config_class=Config) -> Flask:
 
     @app.route('/camp/add', methods=['POST'])
     @login_required
+    @staff_only
     def camp_add():
         """Add and schedule a new health camp location with coordinates."""
         title = request.form.get('title', '').strip()
@@ -796,6 +1231,7 @@ def create_app(config_class=Config) -> Flask:
 
     @app.route('/doctors')
     @login_required
+    @staff_only
     def doctors():
         """Directory of empaneled doctors and clinical specialists."""
         doctors_list = Doctor.query.order_by(Doctor.name.asc()).all()
@@ -803,6 +1239,7 @@ def create_app(config_class=Config) -> Flask:
 
     @app.route('/doctor/add', methods=['POST'])
     @login_required
+    @staff_only
     def doctor_add():
         """Empanel a new medical officer."""
         name = request.form.get('name', '').strip()
@@ -834,6 +1271,7 @@ def create_app(config_class=Config) -> Flask:
 
     @app.route('/appointments')
     @login_required
+    @staff_only
     def appointments():
         """Doctor consultation queue and appointment scheduling."""
         urgency_case = case(
@@ -866,6 +1304,7 @@ def create_app(config_class=Config) -> Flask:
 
     @app.route('/appointment/add', methods=['POST'])
     @login_required
+    @staff_only
     def appointment_add():
         """Book a consultation appointment token for a patient."""
         patient_id = request.form.get('patient_id', type=int)
@@ -899,6 +1338,7 @@ def create_app(config_class=Config) -> Flask:
 
     @app.route('/appointment/<int:id>/status', methods=['POST'])
     @login_required
+    @staff_only
     def appointment_status(id):
         """Update appointment queue status."""
         appt = db.session.get(Appointment, id)
@@ -915,6 +1355,7 @@ def create_app(config_class=Config) -> Flask:
 
     @app.route('/records')
     @login_required
+    @staff_only
     def records():
         """Clinical records directory and consultation history with triage priority."""
         # Prioritize Red-Flag Critical patients at the top of the queue
@@ -943,6 +1384,7 @@ def create_app(config_class=Config) -> Flask:
 
     @app.route('/record/add', methods=['POST'])
     @login_required
+    @staff_only
     def record_add():
         """Record a completed medical consultation, diagnosis, vitals triage, and prescription."""
         patient_id = request.form.get('patient_id', type=int)
@@ -1021,6 +1463,7 @@ def create_app(config_class=Config) -> Flask:
 
     @app.route('/inventory')
     @login_required
+    @staff_only
     def inventory():
         """Pharmaceutical inventory overview and batch stock monitoring."""
         medicines_list = Medicine.query.order_by(Medicine.name.asc()).all()
@@ -1038,6 +1481,7 @@ def create_app(config_class=Config) -> Flask:
 
     @app.route('/medicine/add', methods=['POST'])
     @login_required
+    @staff_only
     def medicine_add():
         """Register a new pharmaceutical stock batch."""
         name = request.form.get('name', '').strip()
@@ -1076,6 +1520,7 @@ def create_app(config_class=Config) -> Flask:
 
     @app.route('/medicine/<int:id>/update-stock', methods=['POST'])
     @login_required
+    @staff_only
     def medicine_update_stock(id):
         """Update inventory stock quantity and reorder threshold for a medicine."""
         med = db.session.get(Medicine, id)

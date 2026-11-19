@@ -88,16 +88,23 @@ def ensure_default_avatar(folder: str = None) -> str:
     return "uploads/default_avatar.png"
 
 
-def generate_qr_code(patient_uid: str, folder: str = None, profile_url: str = None) -> str:
+def generate_qr_code(patient_uid: str, folder: str = None, profile_url: str = None, patient=None) -> str:
     """
-    Generate a dynamic QR code image encoding a valid patient profile URL.
+    Generate a dynamic smartphone-camera scannable QR code image encoding clean, structured plain-text
+    patient identity details plus a direct verification URL:
+
+    SMART HEALTH PASS
+    Patient ID: <10-DIGIT-ID>
+    Name: <First Name> <Last Name>
+    DOB: <DOB> (Age: <Age>)
+    Blood Group: <Blood Group>
+    Allergies: <Allergies>
+    Phone: <Phone>
+    Location: <City>, <State>, <Country>
+    Verify: <Base-URL>/verify-pass/<10-DIGIT-ID>
+
     Saves the generated PNG image to static/qrcodes/patient_<patient_id>.png.
     Also ensures default_qr.png and backwards-compatible <patient_uid>.png exist.
-
-    :param patient_uid: Unique identifier for the patient (e.g., 'PAT-2026-0001').
-    :param folder: Directory path to save the QR code image. Defaults to Config.QRCODE_FOLDER.
-    :param profile_url: Explicit URL to encode in the QR code. If None, auto-generates application URL.
-    :return: Relative static path to the generated QR code (e.g., 'qrcodes/patient_PAT-2026-0001.png').
     """
     target_folder = folder or Config.QRCODE_FOLDER
     os.makedirs(target_folder, exist_ok=True)
@@ -110,21 +117,54 @@ def generate_qr_code(patient_uid: str, folder: str = None, profile_url: str = No
     filename = f"patient_{clean_id}.png"
     filepath = os.path.join(target_folder, filename)
 
-    # Determine full patient profile URL to embed
-    if profile_url:
-        data_to_encode = profile_url
-    else:
+    # Base URL resolution
+    base_url = os.environ.get('BASE_APP_URL', 'http://127.0.0.1:5000').rstrip('/')
+    try:
+        from flask import has_request_context, request
+        if has_request_context() and request.host_url:
+            base_url = request.host_url.rstrip('/')
+    except Exception:
+        pass
+
+    verify_url = profile_url or f"{base_url}/verify-pass/{clean_id}"
+
+    # Query patient if not provided
+    if patient is None:
         try:
-            from flask import has_request_context, request
-            if has_request_context() and request.host_url and 'localhost' not in request.host_url:
-                base = request.host_url.rstrip('/')
-                data_to_encode = f"{base}/patient_card/{clean_id}"
-            else:
-                base_url = os.environ.get('BASE_APP_URL', 'http://127.0.0.1:5000')
-                data_to_encode = f"{base_url.rstrip('/')}/patient_card/{clean_id}"
+            from models import Patient
+            patient = Patient.query.filter_by(patient_uid=clean_id).first()
         except Exception:
-            base_url = os.environ.get('BASE_APP_URL', 'http://127.0.0.1:5000')
-            data_to_encode = f"{base_url.rstrip('/')}/patient_card/{clean_id}"
+            patient = None
+
+    if patient is not None:
+        p_name = getattr(patient, 'display_name', None) or getattr(patient, 'name', 'Patient')
+        p_dob = getattr(patient, 'formatted_dob', None)
+        if not p_dob and getattr(patient, 'dob', None):
+            p_dob = patient.dob.strftime('%Y-%m-%d')
+        p_dob = p_dob or 'N/A'
+        p_age = getattr(patient, 'age', 'N/A')
+        p_blood = getattr(patient, 'blood_group', 'O+') or 'O+'
+        p_allergies = getattr(patient, 'allergies', 'None') or 'None'
+        p_phone = getattr(patient, 'phone', 'N/A') or 'N/A'
+        p_loc = getattr(patient, 'location_display', None) or 'India'
+
+        data_to_encode = (
+            f"SMART HEALTH PASS\n"
+            f"Patient ID: {clean_id}\n"
+            f"Name: {p_name}\n"
+            f"DOB: {p_dob} (Age: {p_age})\n"
+            f"Blood Group: {p_blood}\n"
+            f"Allergies: {p_allergies}\n"
+            f"Phone: {p_phone}\n"
+            f"Location: {p_loc}\n"
+            f"Verify: {verify_url}"
+        )
+    else:
+        data_to_encode = (
+            f"SMART HEALTH PASS\n"
+            f"Patient ID: {clean_id}\n"
+            f"Verify: {verify_url}"
+        )
 
     # Configure high-quality QR code with auto-version fitting
     qr = qrcode.QRCode(
@@ -163,8 +203,8 @@ def regenerate_patient_qr_codes(app, base_url: str = "http://127.0.0.1:5000") ->
         patients = Patient.query.all()
         for p in patients:
             uid_val = getattr(p, 'patient_uid', getattr(p, 'patient_id', str(p.id)))
-            url = f"{base_url.rstrip('/')}/patient_card/{uid_val}"
-            rel_path = generate_qr_code(uid_val, app.config['QRCODE_FOLDER'], profile_url=url)
+            url = f"{base_url.rstrip('/')}/verify-pass/{uid_val}"
+            rel_path = generate_qr_code(uid_val, app.config['QRCODE_FOLDER'], profile_url=url, patient=p)
             p.qr_code_path = rel_path
             count += 1
         db.session.commit()
@@ -279,47 +319,108 @@ def generate_patient_pdf(patient, health_records=None, output_path: str = None):
     # --- Patient Demographic Card ---
     story.append(Paragraph("Patient Identification Profile", section_title))
 
-    # Determine QR code image flowable if available
-    qr_flowable = Paragraph("<b>[No QR Code]</b>", body_style)
-    qr_rel = getattr(patient, 'qr_code_path', None)
+    # 1. Dynamic in-memory QR code generation via io.BytesIO (qrcode + PIL)
+    clean_uid = str(getattr(patient, 'patient_uid', getattr(patient, 'patient_id', ''))).strip()
+    base_url = os.environ.get('BASE_APP_URL', 'https://health-camp-app.onrender.com').rstrip('/')
+    try:
+        from flask import has_request_context, request
+        if has_request_context() and request.host_url:
+            base_url = request.host_url.rstrip('/')
+    except Exception:
+        pass
+
+    verify_url = f"{base_url}/verify-pass/{clean_uid}"
+
+    qr_flowable = None
+    try:
+        qr = qrcode.QRCode(
+            version=None,
+            error_correction=qrcode.constants.ERROR_CORRECT_M,
+            box_size=6,
+            border=2
+        )
+        p_disp_name = getattr(patient, 'display_name', None) or getattr(patient, 'name', 'Patient')
+        p_dob = getattr(patient, 'formatted_dob', None) or (patient.dob.strftime('%Y-%m-%d') if getattr(patient, 'dob', None) else 'N/A')
+        p_age = getattr(patient, 'age', 'N/A')
+        p_blood = getattr(patient, 'blood_group', 'O+') or 'O+'
+        p_allergies = getattr(patient, 'allergies', 'None') or 'None'
+        p_phone = getattr(patient, 'phone', 'N/A') or 'N/A'
+        p_loc = getattr(patient, 'location_display', None) or getattr(patient, 'city', 'India') or 'India'
+
+        qr_text = (
+            f"SMART HEALTH PASS\n"
+            f"Patient ID: {clean_uid}\n"
+            f"Name: {p_disp_name}\n"
+            f"DOB: {p_dob} (Age: {p_age})\n"
+            f"Blood Group: {p_blood}\n"
+            f"Allergies: {p_allergies}\n"
+            f"Phone: {p_phone}\n"
+            f"Location: {p_loc}\n"
+            f"Verify: {verify_url}"
+        )
+        qr.add_data(qr_text)
+        qr.make(fit=True)
+        qr_img = qr.make_image(fill_color="#1E3A8A", back_color="#FFFFFF")
+
+        qr_buf = io.BytesIO()
+        qr_img.save(qr_buf, format='PNG')
+        qr_buf.seek(0)
+        qr_flowable = RLImage(qr_buf, width=1.15 * inch, height=1.15 * inch)
+    except Exception as e:
+        print(f"[WARN] In-memory QR generation error: {e}")
+        qr_flowable = Paragraph("<b>[QR Error]</b>", body_style)
+
+    # 2. Patient Photo flowable with fallback to default_avatar.png
+    photo_flowable = None
+    upload_root = getattr(Config, 'UPLOAD_FOLDER', os.path.join(getattr(Config, 'BASE_DIR', os.getcwd()), 'static', 'uploads'))
     static_root = getattr(Config, 'STATIC_FOLDER', os.path.join(getattr(Config, 'BASE_DIR', os.getcwd()), 'static'))
-    if qr_rel:
-        qr_full_path = os.path.join(static_root, qr_rel)
-        if not os.path.exists(qr_full_path):
-            clean_uid = getattr(patient, 'patient_uid', getattr(patient, 'patient_id', ''))
-            alt1 = os.path.join(static_root, f"qrcodes/patient_{clean_uid}.png")
-            alt2 = os.path.join(static_root, f"qrcodes/{clean_uid}.png")
-            alt3 = os.path.join(static_root, "qrcodes/default_qr.png")
-            if os.path.exists(alt1):
-                qr_full_path = alt1
-            elif os.path.exists(alt2):
-                qr_full_path = alt2
-            elif os.path.exists(alt3):
-                qr_full_path = alt3
-        if os.path.exists(qr_full_path):
-            try:
-                qr_flowable = RLImage(qr_full_path, width=1.1 * inch, height=1.1 * inch)
-            except Exception:
-                qr_flowable = Paragraph("<b>[QR Error]</b>", body_style)
+    photo_rel = getattr(patient, 'photo_filename', None)
+    photo_full_path = None
+
+    if photo_rel:
+        for cand in [
+            os.path.join(upload_root, photo_rel),
+            os.path.join(upload_root, 'patients', photo_rel),
+            os.path.join(static_root, 'uploads', photo_rel)
+        ]:
+            if os.path.exists(cand):
+                photo_full_path = cand
+                break
+
+    if not photo_full_path or not os.path.exists(photo_full_path):
+        ensure_default_avatar(upload_root)
+        def_path = os.path.join(upload_root, 'default_avatar.png')
+        if os.path.exists(def_path):
+            photo_full_path = def_path
+
+    if photo_full_path and os.path.exists(photo_full_path):
+        try:
+            photo_flowable = RLImage(photo_full_path, width=0.95 * inch, height=0.95 * inch)
+        except Exception:
+            photo_flowable = None
 
     p_uid = str(getattr(patient, 'patient_uid', getattr(patient, 'patient_id', 'N/A')))
     p_created = getattr(patient, 'created_at', None)
     reg_date_str = p_created.strftime('%Y-%m-%d') if p_created and hasattr(p_created, 'strftime') else 'N/A'
-    p_name = str(getattr(patient, 'name', 'N/A'))
+    p_name = str(getattr(patient, 'display_name', None) or getattr(patient, 'name', 'N/A'))
     p_gender = str(getattr(patient, 'gender', 'N/A'))
     p_age = str(getattr(patient, 'age', 'N/A'))
     p_phone = str(getattr(patient, 'phone', 'N/A') or 'N/A')
-    p_address = str(getattr(patient, 'address', 'N/A') or 'N/A')
+    p_address = str(getattr(patient, 'location_display', None) or getattr(patient, 'address', 'N/A') or 'N/A')
+    p_blood = str(getattr(patient, 'blood_group', 'O+') or 'O+')
+    p_allergies = str(getattr(patient, 'allergies', 'None') or 'None')
 
     demo_data = [
         [
+            photo_flowable or "",
             Paragraph("<b>Patient UID:</b>", body_bold),
-            Paragraph(p_uid, body_style),
+            Paragraph(f"<font color='#1E40AF'><b>{p_uid}</b></font>", body_style),
             Paragraph("<b>Registered Date:</b>", body_bold),
             Paragraph(reg_date_str, body_style),
             qr_flowable
         ],
         [
+            "",
             Paragraph("<b>Full Name:</b>", body_bold),
             Paragraph(p_name, body_style),
             Paragraph("<b>Gender / Age:</b>", body_bold),
@@ -327,9 +428,18 @@ def generate_patient_pdf(patient, health_records=None, output_path: str = None):
             ""
         ],
         [
+            "",
+            Paragraph("<b>Blood Group:</b>", body_bold),
+            Paragraph(f"<font color='#DC2626'><b>{p_blood}</b></font>", body_style),
+            Paragraph("<b>Known Allergies:</b>", body_bold),
+            Paragraph(p_allergies, body_style),
+            ""
+        ],
+        [
+            "",
             Paragraph("<b>Phone:</b>", body_bold),
             Paragraph(p_phone, body_style),
-            Paragraph("<b>Address:</b>", body_bold),
+            Paragraph("<b>Address / Loc:</b>", body_bold),
             Paragraph(p_address, body_style),
             ""
         ]
@@ -337,19 +447,21 @@ def generate_patient_pdf(patient, health_records=None, output_path: str = None):
 
     demo_table = Table(
         demo_data,
-        colWidths=[90, 130, 85, 135, 82]
+        colWidths=[76, 74, 120, 74, 96, 82]
     )
     demo_table.setStyle(TableStyle([
-        ('SPAN', (4, 0), (4, 2)),  # Span QR code across all 3 rows
-        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#F3F4F6')),
-        ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#D1D5DB')),
-        ('INNERGRID', (0, 0), (3, -1), 0.5, colors.HexColor('#E5E7EB')),
+        ('SPAN', (0, 0), (0, 3)),  # Span patient photo across all 4 rows
+        ('SPAN', (5, 0), (5, 3)),  # Span QR code across all 4 rows
+        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#F8FAFC')),
+        ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#CBD5E1')),
+        ('INNERGRID', (1, 0), (4, -1), 0.5, colors.HexColor('#E2E8F0')),
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('ALIGN', (4, 0), (4, 2), 'CENTER'),
-        ('TOPPADDING', (0, 0), (-1, -1), 6),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
-        ('LEFTPADDING', (0, 0), (-1, -1), 8),
-        ('RIGHTPADDING', (0, 0), (-1, -1), 8),
+        ('ALIGN', (0, 0), (0, 3), 'CENTER'),
+        ('ALIGN', (5, 0), (5, 3), 'CENTER'),
+        ('TOPPADDING', (0, 0), (-1, -1), 4),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+        ('LEFTPADDING', (0, 0), (-1, -1), 6),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 6),
     ]))
     story.append(demo_table)
     story.append(Spacer(1, 16))

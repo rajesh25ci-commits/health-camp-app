@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verify Email OTP - Smart Community Health Camp</title>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@600;700&family=JetBrains+Mono:wght@600;700&display=swap" rel="stylesheet">
+
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- FontAwesome 6 Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        :root {
+            --primary-navy: #070d19;
+            --medical-teal: #06b6d4;
+            --medical-emerald: #10b981;
+            --glass-bg: rgba(15, 23, 42, 0.82);
+            --glass-border: rgba(255, 255, 255, 0.12);
+        }
+
+        body, html {
+            min-height: 100vh;
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', sans-serif;
+            background-color: var(--primary-navy);
+            color: #f1f5f9;
+        }
+
+        .cinematic-wrapper {
+            min-height: 100vh;
+            width: 100%;
+            position: relative;
+            background: linear-gradient(135deg, #070d19 0%, #0a1b2e 30%, #062630 65%, #08162b 100%);
+            background-size: 300% 300%;
+            animation: gradientShift 24s ease infinite;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem 1rem;
+        }
+
+        @keyframes gradientShift {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        .ambient-orb {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(85px);
+            pointer-events: none;
+            opacity: 0.35;
+        }
+
+        .orb-1 { width: 380px; height: 380px; background: radial-gradient(circle, #06b6d4 0%, transparent 70%); top: -80px; left: -80px; }
+        .orb-2 { width: 400px; height: 400px; background: radial-gradient(circle, #10b981 0%, transparent 70%); bottom: -80px; right: -80px; }
+
+        .glass-card {
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px) saturate(180%);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            box-shadow: 0 30px 60px rgba(0,0,0,0.55), 0 0 40px rgba(6,182,212,0.1);
+            position: relative;
+            z-index: 2;
+            overflow: hidden;
+            max-width: 480px;
+            width: 100%;
+        }
+
+        .glass-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; height: 3px;
+            background: linear-gradient(90deg, #06b6d4, #10b981, #3b82f6);
+        }
+
+        .otp-input {
+            letter-spacing: 0.45em;
+            text-align: center;
+            font-size: 1.8rem;
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 700;
+            background: rgba(10, 19, 36, 0.85);
+            border: 2px solid rgba(6, 182, 212, 0.4);
+            color: #38bdf8;
+            border-radius: 14px;
+            padding: 0.75rem 1rem;
+            transition: all 0.25s ease;
+        }
+
+        .otp-input:focus {
+            background: rgba(13, 27, 48, 0.95);
+            border-color: #06b6d4;
+            box-shadow: 0 0 0 4px rgba(6, 182, 212, 0.25);
+            color: #ffffff;
+            outline: none;
+        }
+
+        .btn-cinematic {
+            background: linear-gradient(135deg, #06b6d4 0%, #2563eb 100%);
+            border: none;
+            color: #ffffff;
+            font-weight: 600;
+            font-size: 0.95rem;
+            padding: 0.8rem 1.4rem;
+            border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(6, 182, 212, 0.35);
+            transition: all 0.25s ease;
+        }
+
+        .btn-cinematic:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 30px rgba(6, 182, 212, 0.5);
+            color: #ffffff;
+        }
+
+        .glass-link {
+            color: var(--medical-teal);
+            text-decoration: none;
+        }
+
+        .glass-link:hover {
+            color: #38bdf8;
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="cinematic-wrapper">
+        <div class="ambient-orb orb-1"></div>
+        <div class="ambient-orb orb-2"></div>
+
+        <div class="glass-card p-4 p-sm-5 text-center">
+
+            <!-- Icon Header -->
+            <div class="d-inline-flex align-items-center justify-content-center mb-3 rounded-circle" style="width: 68px; height: 68px; background: rgba(6, 182, 212, 0.15); border: 1px solid rgba(6, 182, 212, 0.35);">
+                <i class="fa-solid fa-envelope-open-text text-info fs-2"></i>
+            </div>
+
+            <h3 class="fw-bold text-white mb-2" style="font-family: 'Poppins', sans-serif;">Verify Your Email</h3>
+            <p class="text-muted small mb-3">
+                Please enter the 6-digit verification OTP dispatched to:
+                <br><strong class="text-info">{{ email or 'your registered email' }}</strong>
+            </p>
+
+            <!-- Flash Notifications -->
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    <div class="mb-3 text-start">
+                        {% for category, message in messages %}
+                            <div class="alert alert-{{ category }} bg-dark bg-opacity-75 border-{{ category }} border-opacity-50 text-light py-2 px-3 small rounded-3 mb-2" role="alert">
+                                {{ message }}
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% endwith %}
+
+            <!-- Demo Mode Helper Badge -->
+            {% if demo_otp %}
+            <div class="p-3 mb-4 rounded-3 text-start" style="background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.35);">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <span class="text-success fw-bold small"><i class="fa-solid fa-shield-halved me-1"></i> Demo Verification Code</span>
+                    <button type="button" class="btn btn-outline-success btn-sm py-0 px-2 rounded-pill" onclick="autofillDemo('{{ demo_otp }}')" style="font-size: 0.72rem;">
+                        <i class="fa-solid fa-wand-magic-sparkles me-1"></i> Autofill
+                    </button>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-50 fs-6 px-3 py-1 font-monospace">{{ demo_otp }}</span>
+                    <span class="text-muted" style="font-size: 0.72rem;">(Auto-generated for offline evaluation)</span>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- OTP Form -->
+            <form method="POST" action="{{ url_for('verify_email') }}">
+                <input type="hidden" name="email" value="{{ email }}">
+
+                <div class="mb-4">
+                    <input type="text" class="form-control otp-input" id="otpInput" name="otp" placeholder="••••••" maxlength="6" required autofocus autocomplete="one-time-code" pattern="[0-9]{6}">
+                    <div class="text-muted small mt-2" style="font-size: 0.75rem;">Enter all 6 numeric digits</div>
+                </div>
+
+                <button type="submit" class="btn btn-cinematic w-100 mb-3 d-flex align-items-center justify-content-center gap-2">
+                    <i class="fa-solid fa-circle-check"></i>
+                    <span>Verify & Activate Health Portal</span>
+                </button>
+            </form>
+
+            <div class="d-flex justify-content-between align-items-center pt-2 small">
+                <a href="{{ url_for('resend_otp', email=email) }}" class="glass-link">
+                    <i class="fa-solid fa-rotate-right me-1"></i> Resend Code
+                </a>
+                <a href="{{ url_for('login', portal='patient', tab='signin') }}" class="text-muted text-decoration-none">
+                    <i class="fa-solid fa-arrow-left me-1"></i> Back to Sign In
+                </a>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        function autofillDemo(code) {
+            const input = document.getElementById('otpInput');
+            if (input) {
+                input.value = code;
+                input.focus();
+            }
+        }
+    </script>
+</body>
+</html>

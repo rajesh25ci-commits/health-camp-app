@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sign In & Staff Portal - Smart Community Health Camp</title>
+    <title>Dual-Portal Gateway - Smart Community Health Camp</title>
 
-    <!-- Google Fonts: Inter & Poppins -->
+    <!-- Google Fonts: Inter, Poppins, JetBrains Mono -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -22,9 +22,10 @@
             --medical-teal: #06b6d4;
             --medical-emerald: #10b981;
             --electric-blue: #3b82f6;
+            --accent-purple: #8b5cf6;
             --text-light: #f1f5f9;
             --text-muted: #94a3b8;
-            --glass-bg: rgba(15, 23, 42, 0.72);
+            --glass-bg: rgba(15, 23, 42, 0.76);
             --glass-border: rgba(255, 255, 255, 0.12);
         }
 
@@ -33,7 +34,7 @@
         }
 
         body, html {
-            height: 100%;
+            min-height: 100%;
             margin: 0;
             padding: 0;
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
@@ -57,7 +58,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: 2rem 1rem;
+            padding: 2.5rem 1rem;
             z-index: 1;
         }
 
@@ -67,7 +68,7 @@
             100% { background-position: 0% 50%; }
         }
 
-        /* Subtle Floating Glowing Ambient Orbs */
+        /* Ambient Orbs */
         .ambient-orb {
             position: absolute;
             border-radius: 50%;
@@ -79,25 +80,25 @@
         }
 
         .orb-1 {
-            width: 420px;
-            height: 420px;
+            width: 440px;
+            height: 440px;
             background: radial-gradient(circle, #06b6d4 0%, rgba(6, 182, 212, 0) 70%);
-            top: -100px;
+            top: -120px;
             left: -100px;
         }
 
         .orb-2 {
-            width: 460px;
-            height: 460px;
+            width: 480px;
+            height: 480px;
             background: radial-gradient(circle, #10b981 0%, rgba(16, 185, 129, 0) 70%);
             bottom: -120px;
-            right: 10%;
+            right: 8%;
             animation-delay: -7s;
         }
 
         .orb-3 {
-            width: 360px;
-            height: 360px;
+            width: 380px;
+            height: 380px;
             background: radial-gradient(circle, #3b82f6 0%, rgba(59, 130, 246, 0) 70%);
             top: 40%;
             right: -80px;
@@ -110,12 +111,12 @@
             100% { transform: translate(-35px, 45px) scale(0.96); }
         }
 
-        /* Live Animated ECG Pulse Container */
+        /* ECG Pulse */
         .ecg-container {
             width: 100%;
-            height: 64px;
+            height: 60px;
             position: relative;
-            margin: 1.5rem 0;
+            margin: 1.25rem 0;
             overflow: hidden;
         }
 
@@ -144,20 +145,10 @@
         }
 
         @keyframes ecgFlow {
-            0% {
-                stroke-dashoffset: 1200;
-                opacity: 0.25;
-            }
-            15% {
-                opacity: 1;
-            }
-            85% {
-                opacity: 1;
-            }
-            100% {
-                stroke-dashoffset: 0;
-                opacity: 0.25;
-            }
+            0% { stroke-dashoffset: 1200; opacity: 0.25; }
+            15% { opacity: 1; }
+            85% { opacity: 1; }
+            100% { stroke-dashoffset: 0; opacity: 0.25; }
         }
 
         /* Frosted Glass Card */
@@ -174,7 +165,6 @@
             transition: transform 0.3s ease, box-shadow 0.3s ease;
         }
 
-        /* Glass Glow Top Accent */
         .glass-card::before {
             content: '';
             position: absolute;
@@ -186,49 +176,98 @@
             z-index: 3;
         }
 
-        /* Interactive Pill Tabs */
-        .auth-nav-pills {
-            background: rgba(10, 19, 36, 0.65);
-            border-radius: 16px;
+        /* Dual Portal Primary Nav */
+        .portal-switcher {
+            background: rgba(10, 19, 36, 0.8);
+            border-radius: 18px;
             padding: 6px;
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            gap: 4px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            gap: 6px;
+            margin-bottom: 1.5rem;
         }
 
-        .auth-nav-pills .nav-link {
-            color: var(--text-muted);
-            border-radius: 12px;
-            padding: 10px 14px;
-            font-size: 0.85rem;
-            font-weight: 600;
+        .portal-btn {
+            flex: 1;
+            padding: 12px 14px;
+            border-radius: 14px;
             border: 1px solid transparent;
+            background: transparent;
+            color: var(--text-muted);
+            font-weight: 600;
+            font-size: 0.92rem;
+            cursor: pointer;
             transition: all 0.25s ease;
-            text-align: center;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
         }
 
-        .auth-nav-pills .nav-link:hover {
+        .portal-btn:hover {
             color: #ffffff;
             background: rgba(255, 255, 255, 0.05);
         }
 
-        .auth-nav-pills .nav-link.active {
+        .portal-btn.active.patient-active {
             color: #ffffff;
-            background: linear-gradient(135deg, #06b6d4 0%, #2563eb 100%);
-            box-shadow: 0 4px 18px rgba(6, 182, 212, 0.35);
-            border-color: rgba(255, 255, 255, 0.2);
+            background: linear-gradient(135deg, #06b6d4 0%, #0284c7 100%);
+            box-shadow: 0 6px 20px rgba(6, 182, 212, 0.35);
+            border-color: rgba(255, 255, 255, 0.25);
         }
 
-        /* Form Controls & Floating Inputs */
+        .portal-btn.active.doctor-active {
+            color: #ffffff;
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            box-shadow: 0 6px 20px rgba(16, 185, 129, 0.35);
+            border-color: rgba(255, 255, 255, 0.25);
+        }
+
+        /* Sub Tab Pills */
+        .sub-nav-pills {
+            background: rgba(15, 23, 42, 0.6);
+            border-radius: 12px;
+            padding: 4px;
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            display: flex;
+            gap: 4px;
+            margin-bottom: 1.25rem;
+        }
+
+        .sub-nav-link {
+            flex: 1;
+            padding: 8px 12px;
+            border-radius: 10px;
+            border: none;
+            background: transparent;
+            color: var(--text-muted);
+            font-size: 0.83rem;
+            font-weight: 600;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.2s ease;
+        }
+
+        .sub-nav-link:hover {
+            color: #ffffff;
+        }
+
+        .sub-nav-link.active {
+            color: #ffffff;
+            background: rgba(255, 255, 255, 0.12);
+        }
+
+        /* Form Controls */
         .glass-input-wrap {
             position: relative;
-            margin-bottom: 1.15rem;
+            margin-bottom: 1rem;
         }
 
         .glass-input-wrap label {
-            font-size: 0.82rem;
+            font-size: 0.8rem;
             font-weight: 600;
             color: #cbd5e1;
-            margin-bottom: 0.4rem;
+            margin-bottom: 0.35rem;
             display: flex;
             align-items: center;
             justify-content: space-between;
@@ -245,7 +284,7 @@
             border: 1px solid rgba(255, 255, 255, 0.12);
             border-right: none;
             color: #64748b;
-            padding: 0.7rem 0.95rem;
+            padding: 0.65rem 0.9rem;
             border-top-left-radius: 12px;
             border-bottom-left-radius: 12px;
             display: flex;
@@ -258,27 +297,12 @@
         .glass-input-group .form-select {
             background: rgba(10, 19, 36, 0.7);
             border: 1px solid rgba(255, 255, 255, 0.12);
-            border-left: none;
             color: #ffffff;
-            padding: 0.7rem 0.95rem;
-            font-size: 0.92rem;
+            padding: 0.65rem 0.95rem;
+            font-size: 0.88rem;
             border-top-right-radius: 12px;
             border-bottom-right-radius: 12px;
             transition: all 0.25s ease;
-        }
-
-        .glass-input-group .form-control:focus,
-        .glass-input-group .form-select:focus {
-            background: rgba(15, 28, 54, 0.92);
-            border-color: #06b6d4;
-            box-shadow: 0 0 0 3px rgba(6, 182, 212, 0.25);
-            color: #ffffff;
-            outline: none;
-        }
-
-        .glass-input-group:focus-within .input-icon {
-            border-color: #06b6d4;
-            color: #06b6d4;
         }
 
         .glass-input-group .form-control.has-toggle {
@@ -287,47 +311,89 @@
             border-right: none;
         }
 
-        .btn-eye-toggle {
+        .glass-input-group .btn-eye-toggle {
             background: rgba(10, 19, 36, 0.7);
             border: 1px solid rgba(255, 255, 255, 0.12);
             border-left: none;
-            color: #94a3b8;
-            padding: 0 0.95rem;
+            color: #64748b;
+            padding: 0 0.9rem;
             border-top-right-radius: 12px;
             border-bottom-right-radius: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
             cursor: pointer;
             transition: color 0.2s;
+            display: flex;
+            align-items: center;
         }
 
-        .btn-eye-toggle:hover {
-            color: #06b6d4;
-            background: rgba(15, 28, 54, 0.92);
+        .glass-input-group .btn-eye-toggle:hover {
+            color: var(--medical-teal);
         }
 
-        .glass-input-group:focus-within .btn-eye-toggle {
-            border-color: #06b6d4;
+        .glass-input-group .form-control:focus,
+        .glass-input-group .form-select:focus {
+            background: rgba(13, 27, 48, 0.9);
+            border-color: var(--medical-teal);
+            box-shadow: 0 0 0 3px rgba(6, 182, 212, 0.22);
+            color: #ffffff;
         }
 
         .glass-input-group .form-select option {
-            background: #0f172a;
+            background-color: #0f172a;
+            color: #ffffff;
+        }
+
+        /* Buttons */
+        .btn-cinematic-patient {
+            background: linear-gradient(135deg, #06b6d4 0%, #2563eb 100%);
+            border: none;
+            color: #ffffff;
+            font-weight: 600;
+            font-size: 0.92rem;
+            padding: 0.8rem 1.4rem;
+            border-radius: 12px;
+            letter-spacing: 0.02em;
+            box-shadow: 0 8px 24px rgba(6, 182, 212, 0.35);
+            transition: all 0.25s ease;
+        }
+
+        .btn-cinematic-patient:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 30px rgba(6, 182, 212, 0.5);
+            color: #ffffff;
+        }
+
+        .btn-cinematic-doctor {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            border: none;
+            color: #ffffff;
+            font-weight: 600;
+            font-size: 0.92rem;
+            padding: 0.8rem 1.4rem;
+            border-radius: 12px;
+            letter-spacing: 0.02em;
+            box-shadow: 0 8px 24px rgba(16, 185, 129, 0.35);
+            transition: all 0.25s ease;
+        }
+
+        .btn-cinematic-doctor:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 30px rgba(16, 185, 129, 0.5);
             color: #ffffff;
         }
 
         /* Password Strength Meter */
         .password-strength-container {
-            margin-top: 0.45rem;
+            margin-top: 0.35rem;
         }
 
         .strength-meter-bar {
             height: 4px;
+            width: 100%;
             background: rgba(255, 255, 255, 0.1);
-            border-radius: 2px;
-            overflow: hidden;
+            border-radius: 4px;
             display: flex;
-            gap: 2px;
+            gap: 4px;
+            overflow: hidden;
         }
 
         .strength-step {
@@ -338,263 +404,155 @@
         }
 
         .strength-label {
-            font-size: 0.74rem;
-            color: var(--text-muted);
-            margin-top: 0.25rem;
             display: flex;
             justify-content: space-between;
+            font-size: 0.72rem;
+            margin-top: 3px;
         }
 
-        /* Buttons */
-        .btn-cinematic {
-            background: linear-gradient(135deg, #06b6d4 0%, #2563eb 100%);
-            border: none;
-            color: #ffffff;
-            font-weight: 600;
-            padding: 0.8rem 1.4rem;
+        /* Feature Badges */
+        .feature-badge {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
             border-radius: 14px;
-            font-size: 0.95rem;
-            letter-spacing: 0.3px;
-            box-shadow: 0 8px 24px rgba(6, 182, 212, 0.35);
-            transition: all 0.3s ease;
-            position: relative;
-            overflow: hidden;
+            padding: 0.8rem 1rem;
+            backdrop-filter: blur(10px);
+            transition: all 0.25s ease;
         }
 
-        .btn-cinematic:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 12px 30px rgba(6, 182, 212, 0.5);
-            color: #ffffff;
-        }
-
-        .btn-cinematic:active {
-            transform: translateY(0);
-        }
-
-        /* Feature Badges & Showcase Card */
-        .showcase-badge {
-            background: rgba(255, 255, 255, 0.04);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            backdrop-filter: blur(12px);
-            border-radius: 16px;
-            padding: 1rem;
-            transition: all 0.3s ease;
-        }
-
-        .showcase-badge:hover {
+        .feature-badge:hover {
             background: rgba(255, 255, 255, 0.08);
-            border-color: rgba(6, 182, 212, 0.3);
-            transform: translateY(-3px);
-            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+            border-color: rgba(6, 182, 212, 0.35);
+            transform: translateX(4px);
         }
 
-        .badge-icon-box {
-            width: 44px;
-            height: 44px;
-            min-width: 44px;
-            border-radius: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.25rem;
-        }
-
-        /* Alerts in Glass Card */
-        .glass-alert {
-            background: rgba(239, 68, 68, 0.15);
-            border: 1px solid rgba(239, 68, 68, 0.3);
-            color: #fca5a5;
-            border-radius: 14px;
-            font-size: 0.86rem;
-            padding: 0.75rem 1rem;
-        }
-
-        .glass-alert.alert-success {
-            background: rgba(16, 185, 129, 0.15);
-            border-color: rgba(16, 185, 129, 0.3);
-            color: #6ee7b7;
-        }
-
-        .glass-alert.alert-warning {
-            background: rgba(245, 158, 11, 0.15);
-            border-color: rgba(245, 158, 11, 0.3);
-            color: #fde68a;
-        }
-
-        .glass-alert.alert-info {
-            background: rgba(6, 182, 212, 0.15);
-            border-color: rgba(6, 182, 212, 0.3);
-            color: #a5f3fc;
-        }
-
-        /* Link Hover */
         .glass-link {
-            color: #38bdf8;
+            color: var(--medical-teal);
             text-decoration: none;
             transition: color 0.2s;
         }
 
         .glass-link:hover {
-            color: #7dd3fc;
+            color: #38bdf8;
             text-decoration: underline;
         }
 
-        /* Custom Scrollbar for Card */
-        .card-scroll {
-            max-height: 85vh;
-            overflow-y: auto;
-            scrollbar-width: thin;
-            scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+        .glass-alert {
+            background: rgba(15, 23, 42, 0.85);
+            border-radius: 12px;
+            padding: 0.75rem 1rem;
+            font-size: 0.84rem;
+            border: 1px solid rgba(255, 255, 255, 0.1);
         }
 
-        .card-scroll::-webkit-scrollbar {
-            width: 5px;
-        }
-
-        .card-scroll::-webkit-scrollbar-thumb {
-            background: rgba(255, 255, 255, 0.2);
-            border-radius: 4px;
-        }
+        .glass-alert.alert-success { border-color: rgba(16, 185, 129, 0.4); color: #6ee7b7; }
+        .glass-alert.alert-danger { border-color: rgba(239, 68, 68, 0.4); color: #fca5a5; }
+        .glass-alert.alert-warning { border-color: rgba(245, 158, 11, 0.4); color: #fcd34d; }
+        .glass-alert.alert-info { border-color: rgba(6, 182, 212, 0.4); color: #67e8f9; }
     </style>
 </head>
 <body>
 
-    <!-- Ambient Glowing Background Orbs -->
-    <div class="ambient-orb orb-1"></div>
-    <div class="ambient-orb orb-2"></div>
-    <div class="ambient-orb orb-3"></div>
-
     <div class="cinematic-wrapper">
-        <div class="container-xl position-relative z-2">
-            <div class="row align-items-center justify-content-center g-4 g-xl-5 min-vh-100 py-3">
+        <!-- Floating Glowing Ambient Orbs -->
+        <div class="ambient-orb orb-1"></div>
+        <div class="ambient-orb orb-2"></div>
+        <div class="ambient-orb orb-3"></div>
 
-                <!-- Left Showcase Panel (Hero Mission & Live Impact Badges) -->
-                <div class="col-12 col-lg-6 col-xl-6 text-start d-flex flex-column justify-content-center pe-lg-4">
-                    
-                    <!-- Top Mission Badge -->
-                    <div class="d-inline-flex align-items-center gap-2 px-3 py-1 rounded-pill bg-cyan bg-opacity-10 border border-info border-opacity-25 text-info mb-3" style="width: fit-content;">
-                        <span class="spinner-grow spinner-grow-sm text-info" role="status" style="width: 8px; height: 8px;"></span>
-                        <span class="small fw-semibold text-uppercase font-monospace" style="letter-spacing: 1.2px; font-size: 0.75rem;">
-                            Live Community Healthcare Operations
-                        </span>
+        <div class="container-xl position-relative" style="z-index: 2;">
+            <div class="row align-items-center g-4 g-lg-5">
+
+                <!-- Left Showcase Panel -->
+                <div class="col-12 col-lg-6 d-none d-lg-block text-start pe-lg-4">
+                    <!-- Brand Pill -->
+                    <div class="d-inline-flex align-items-center gap-2 px-3 py-1 rounded-pill mb-3" style="background: rgba(6, 182, 212, 0.12); border: 1px solid rgba(6, 182, 212, 0.3);">
+                        <i class="fa-solid fa-heart-pulse text-info"></i>
+                        <span class="text-info fw-semibold" style="font-size: 0.82rem; letter-spacing: 0.05em; text-transform: uppercase;">Smart Community Healthcare v3.2</span>
                     </div>
 
-                    <!-- Main Brand Headline -->
-                    <div class="d-flex align-items-center gap-3 mb-2">
-                        <div class="bg-danger text-white rounded-circle p-3 d-flex align-items-center justify-content-center shadow-lg" style="width: 54px; height: 54px; min-width: 54px; background: linear-gradient(135deg, #ef4444, #dc2626);">
-                            <i class="fa-solid fa-heart-pulse fs-3 fa-beat"></i>
-                        </div>
-                        <div>
-                            <h1 class="h2 fw-bold text-white mb-0 brand-font tracking-tight">Smart Health Camp</h1>
-                            <span class="text-info text-uppercase fw-semibold font-monospace" style="font-size: 0.74rem; letter-spacing: 1.5px;">
-                                Rural & Urban Outreach Medical Portal
-                            </span>
-                        </div>
-                    </div>
-
-                    <p class="text-light text-opacity-75 lead fs-6 mt-2 mb-3" style="max-width: 540px;">
-                        Unified digital healthcare operations empowering camp doctors, field triage teams, and community beneficiaries with instant QR passes and clinical decision support.
+                    <h1 class="display-5 fw-bold text-white mb-2 brand-font" style="letter-spacing: -0.02em; line-height: 1.15;">
+                        Next-Gen Community <br>
+                        <span style="background: linear-gradient(90deg, #06b6d4, #10b981, #3b82f6); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Health Camp Management</span>
+                    </h1>
+                    <p class="lead text-muted mb-3" style="font-size: 1.05rem; line-height: 1.6;">
+                        Dual-Portal healthcare architecture empowering beneficiaries with 10-Digit Digital QR Health Passes while providing clinicians with real-time AI vitals triage, smart prescriptions, and 108 ambulance dispatch.
                     </p>
 
-                    <!-- Animated Live Heartbeat / ECG Pulse Line -->
+                    <!-- Animated ECG Pulse Line -->
                     <div class="ecg-container">
-                        <svg class="ecg-svg" viewBox="0 0 1000 120" preserveAspectRatio="none">
-                            <line class="ecg-grid-line" x1="0" y1="60" x2="1000" y2="60" />
-                            <path class="ecg-pulse-line" d="M 0 60 L 140 60 L 155 60 L 165 48 L 175 72 L 185 60 L 220 60 L 230 15 L 245 105 L 255 45 L 265 65 L 275 60 L 320 60 L 335 45 L 350 60 L 480 60 L 495 60 L 505 48 L 515 72 L 525 60 L 560 60 L 570 15 L 585 105 L 595 45 L 605 65 L 615 60 L 660 60 L 675 45 L 690 60 L 820 60 L 835 60 L 845 48 L 855 72 L 865 60 L 900 60 L 910 15 L 925 105 L 935 45 L 945 65 L 955 60 L 1000 60" />
+                        <svg class="ecg-svg" viewBox="0 0 600 64" preserveAspectRatio="none">
+                            <line x1="0" y1="32" x2="600" y2="32" class="ecg-grid-line"></line>
+                            <path class="ecg-pulse-line" d="M 0,32 L 80,32 L 95,32 L 105,10 L 115,54 L 125,24 L 135,38 L 145,32 L 230,32 L 245,32 L 255,6 L 265,58 L 275,18 L 285,42 L 295,32 L 380,32 L 395,32 L 405,12 L 415,52 L 425,26 L 435,36 L 445,32 L 530,32 L 545,32 L 555,8 L 565,56 L 575,22 L 585,38 L 600,32"></path>
                         </svg>
                     </div>
 
-                    <!-- 4 Live Camp Impact Badges -->
-                    <div class="row g-3 pt-1">
-                        <!-- Badge 1: Digital QR Passes -->
+                    <!-- Impact Feature Badges -->
+                    <div class="row g-2 pt-1">
                         <div class="col-12 col-sm-6">
-                            <div class="showcase-badge d-flex align-items-center gap-3">
-                                <div class="badge-icon-box bg-primary bg-opacity-20 text-info">
-                                    <i class="fa-solid fa-qrcode"></i>
+                            <div class="feature-badge">
+                                <div class="d-flex align-items-center gap-2 mb-1">
+                                    <div class="rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px; background: rgba(6, 182, 212, 0.2);">
+                                        <i class="fa-solid fa-qrcode text-info" style="font-size: 0.9rem;"></i>
+                                    </div>
+                                    <h6 class="mb-0 text-white fw-semibold" style="font-size: 0.88rem;">10-Digit QR Health Pass</h6>
                                 </div>
-                                <div>
-                                    <h6 class="fw-bold text-white mb-0" style="font-size: 0.9rem;">Digital QR Passes</h6>
-                                    <small class="text-muted" style="font-size: 0.78rem;">Instant check-in & ID verification</small>
-                                </div>
+                                <p class="text-muted mb-0 small" style="font-size: 0.77rem;">Smartphone camera scannable digital passes with direct verification.</p>
                             </div>
                         </div>
 
-                        <!-- Badge 2: 108 Emergency Triage -->
                         <div class="col-12 col-sm-6">
-                            <div class="showcase-badge d-flex align-items-center gap-3">
-                                <div class="badge-icon-box bg-danger bg-opacity-20 text-danger">
-                                    <i class="fa-solid fa-truck-medical"></i>
+                            <div class="feature-badge">
+                                <div class="d-flex align-items-center gap-2 mb-1">
+                                    <div class="rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px; background: rgba(16, 185, 129, 0.2);">
+                                        <i class="fa-solid fa-truck-medical text-success" style="font-size: 0.9rem;"></i>
+                                    </div>
+                                    <h6 class="mb-0 text-white fw-semibold" style="font-size: 0.88rem;">108 Emergency Triage</h6>
                                 </div>
-                                <div>
-                                    <h6 class="fw-bold text-white mb-0" style="font-size: 0.9rem;">108 Emergency Triage</h6>
-                                    <small class="text-muted" style="font-size: 0.78rem;">Vitals crisis & ambulance referral</small>
-                                </div>
+                                <p class="text-muted mb-0 small" style="font-size: 0.77rem;">Automated critical vitals red-flagging & live referral audit logs.</p>
                             </div>
                         </div>
 
-                        <!-- Badge 3: Multilingual AI Care -->
                         <div class="col-12 col-sm-6">
-                            <div class="showcase-badge d-flex align-items-center gap-3">
-                                <div class="badge-icon-box bg-success bg-opacity-20 text-success">
-                                    <i class="fa-solid fa-language"></i>
+                            <div class="feature-badge">
+                                <div class="d-flex align-items-center gap-2 mb-1">
+                                    <div class="rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px; background: rgba(139, 92, 246, 0.2);">
+                                        <i class="fa-solid fa-language text-primary" style="font-size: 0.9rem;"></i>
+                                    </div>
+                                    <h6 class="mb-0 text-white fw-semibold" style="font-size: 0.88rem;">Multilingual AI Care</h6>
                                 </div>
-                                <div>
-                                    <h6 class="fw-bold text-white mb-0" style="font-size: 0.9rem;">Multilingual AI Care</h6>
-                                    <small class="text-muted" style="font-size: 0.78rem;">English, हिन्दी, ಕನ್ನಡ & Hinglish</small>
-                                </div>
+                                <p class="text-muted mb-0 small" style="font-size: 0.77rem;">Clinical advice in Kannada, Hindi, English, and Hinglish.</p>
                             </div>
                         </div>
 
-                        <!-- Badge 4: Symptom-First Schedule -->
                         <div class="col-12 col-sm-6">
-                            <div class="showcase-badge d-flex align-items-center gap-3">
-                                <div class="badge-icon-box bg-warning bg-opacity-20 text-warning">
-                                    <i class="fa-solid fa-pills"></i>
+                            <div class="feature-badge">
+                                <div class="d-flex align-items-center gap-2 mb-1">
+                                    <div class="rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px; background: rgba(245, 158, 11, 0.2);">
+                                        <i class="fa-solid fa-envelope-circle-check text-warning" style="font-size: 0.9rem;"></i>
+                                    </div>
+                                    <h6 class="mb-0 text-white fw-semibold" style="font-size: 0.88rem;">Email OTP Verification</h6>
                                 </div>
-                                <div>
-                                    <h6 class="fw-bold text-white mb-0" style="font-size: 0.9rem;">Symptom-First Rx</h6>
-                                    <small class="text-muted" style="font-size: 0.78rem;">Automated dosage scheduling</small>
-                                </div>
+                                <p class="text-muted mb-0 small" style="font-size: 0.77rem;">Secure 6-digit verification ensuring authenticated patient records.</p>
                             </div>
                         </div>
                     </div>
-
-                    <!-- Bottom Security Pill -->
-                    <div class="d-flex align-items-center gap-2 mt-4 text-muted small">
-                        <i class="fa-solid fa-shield-halved text-success"></i>
-                        <span>Cryptographically protected with PBKDF2/scrypt password hashing & Camp Access PIN.</span>
-                    </div>
-
                 </div>
 
-                <!-- Right Frosted-Glass Authentication Card -->
-                <div class="col-12 col-lg-6 col-xl-5 offset-xl-1">
-                    <div class="glass-card p-4 p-sm-5 card-scroll">
-                        
-                        <!-- Header with Mode Selector -->
-                        <div class="text-center mb-4">
-                            <h3 class="fw-bold text-white mb-1 brand-font">Medical Staff Portal</h3>
-                            <p class="text-muted small mb-0">Authorized Health Camp Officers & Clinical Triage</p>
-                        </div>
+                <!-- Right Frosted-Glass Dual-Portal Authentication Card -->
+                <div class="col-12 col-lg-6 col-xl-6">
+                    <div class="glass-card p-4 p-sm-4 p-md-5">
 
-                        <!-- Pill Tabs -->
-                        <ul class="nav nav-pills auth-nav-pills nav-fill mb-4" id="authTabs" role="tablist">
-                            <li class="nav-item" role="presentation">
-                                <button class="nav-link {% if not active_tab or active_tab == 'login' %}active{% endif %}" id="pills-login-tab" data-bs-toggle="pill" data-bs-target="#pills-login" type="button" role="tab" aria-controls="pills-login" aria-selected="{% if not active_tab or active_tab == 'login' %}true{% else %}false{% endif %}">
-                                    <i class="fa-solid fa-right-to-bracket me-1"></i> Sign In
-                                </button>
-                            </li>
-                            <li class="nav-item" role="presentation">
-                                <button class="nav-link {% if active_tab == 'setup' %}active{% endif %}" id="pills-setup-tab" data-bs-toggle="pill" data-bs-target="#pills-setup" type="button" role="tab" aria-controls="pills-setup" aria-selected="{% if active_tab == 'setup' %}true{% else %}false{% endif %}">
-                                    <i class="fa-solid fa-user-plus me-1"></i> New Account
-                                </button>
-                            </li>
-                            <li class="nav-item" role="presentation">
-                                <button class="nav-link {% if active_tab == 'reset' %}active{% endif %}" id="pills-reset-tab" data-bs-toggle="pill" data-bs-target="#pills-reset" type="button" role="tab" aria-controls="pills-reset" aria-selected="{% if active_tab == 'reset' %}true{% else %}false{% endif %}">
-                                    <i class="fa-solid fa-key me-1"></i> Reset PIN
-                                </button>
-                            </li>
-                        </ul>
+                        <!-- Primary Dual-Portal Switcher -->
+                        <div class="portal-switcher">
+                            <button type="button" class="portal-btn {% if portal != 'doctor' %}active patient-active{% endif %}" id="btnPortalPatient" onclick="switchPortal('patient')">
+                                <i class="fa-solid fa-hospital-user"></i>
+                                <span>Patient Portal</span>
+                            </button>
+                            <button type="button" class="portal-btn {% if portal == 'doctor' %}active doctor-active{% endif %}" id="btnPortalDoctor" onclick="switchPortal('doctor')">
+                                <i class="fa-solid fa-user-doctor"></i>
+                                <span>Doctor & Staff</span>
+                            </button>
+                        </div>
 
                         <!-- Flash Notifications -->
                         {% with messages = get_flashed_messages(with_categories=true) %}
@@ -619,267 +577,519 @@
                             {% endif %}
                         {% endwith %}
 
-                        <!-- Tab Content Panels -->
-                        <div class="tab-content" id="authTabsContent">
+                        <!-- ============================================================= -->
+                        <!-- PORTAL 1: PATIENT PORTAL -->
+                        <!-- ============================================================= -->
+                        <div id="sectionPatientPortal" style="display: {% if portal != 'doctor' %}block{% else %}none{% endif %};">
+                            
+                            <!-- Sub Tab Selector -->
+                            <div class="sub-nav-pills">
+                                <button type="button" class="sub-nav-link {% if tab != 'signup' %}active{% endif %}" id="subTabPtSignin" onclick="switchSubTab('patient', 'signin')">
+                                    <i class="fa-solid fa-right-to-bracket me-1"></i> Patient Sign In
+                                </button>
+                                <button type="button" class="sub-nav-link {% if tab == 'signup' %}active{% endif %}" id="subTabPtSignup" onclick="switchSubTab('patient', 'signup')">
+                                    <i class="fa-solid fa-user-plus me-1"></i> Create Patient Account
+                                </button>
+                            </div>
 
-                            <!-- ============================================== -->
-                            <!-- TAB 1: SIGN IN -->
-                            <!-- ============================================== -->
-                            <div class="tab-pane fade {% if not active_tab or active_tab == 'login' %}show active{% endif %}" id="pills-login" role="tabpanel" aria-labelledby="pills-login-tab">
-                                <form method="POST" action="{{ url_for('login') }}">
-                                    <input type="hidden" name="action" value="login">
-
-                                    <!-- Username -->
+                            <!-- PATIENT SIGN IN -->
+                            <div id="panelPtSignin" style="display: {% if tab != 'signup' %}block{% else %}none{% endif %};">
+                                <form method="POST" action="{{ url_for('patient_login') }}">
+                                    <!-- Email / Username -->
                                     <div class="glass-input-wrap">
-                                        <label for="loginUsername">Staff Username</label>
+                                        <label for="ptLoginEmail">Registered Email / Username</label>
                                         <div class="glass-input-group">
-                                            <span class="input-icon"><i class="fa-solid fa-user"></i></span>
-                                            <input type="text" class="form-control" id="loginUsername" name="username" placeholder="Enter your staff username" required autofocus autocomplete="username">
+                                            <span class="input-icon"><i class="fa-solid fa-envelope"></i></span>
+                                            <input type="text" class="form-control" id="ptLoginEmail" name="email" placeholder="e.g. yourname@gmail.com" required autofocus autocomplete="username">
                                         </div>
                                     </div>
 
                                     <!-- Password with Eye Toggle -->
                                     <div class="glass-input-wrap">
-                                        <div class="d-flex justify-content-between align-items-center mb-1">
-                                            <label for="loginPassword" class="mb-0">Secure Password</label>
-                                            <a href="javascript:void(0);" onclick="switchToTab('pills-reset-tab')" class="glass-link small" style="font-size: 0.78rem;">Forgot password?</a>
-                                        </div>
+                                        <label for="ptLoginPassword">Password</label>
                                         <div class="glass-input-group">
                                             <span class="input-icon"><i class="fa-solid fa-lock"></i></span>
-                                            <input type="password" class="form-control has-toggle" id="loginPassword" name="password" placeholder="Enter your password" required autocomplete="current-password">
-                                            <button type="button" class="btn-eye-toggle" onclick="togglePasswordVisibility('loginPassword', this)" title="Show/Hide Password">
+                                            <input type="password" class="form-control has-toggle" id="ptLoginPassword" name="password" placeholder="Enter your password" required autocomplete="current-password">
+                                            <button type="button" class="btn-eye-toggle" onclick="togglePasswordVisibility('ptLoginPassword', this)" title="Show/Hide Password">
                                                 <i class="fa-solid fa-eye"></i>
                                             </button>
                                         </div>
                                     </div>
 
                                     <!-- Remember Me Checkbox -->
-                                    <div class="d-flex justify-content-between align-items-center mb-4">
+                                    <div class="d-flex justify-content-between align-items-center mb-3">
                                         <div class="form-check">
-                                            <input class="form-check-input bg-dark border-secondary" type="checkbox" id="rememberMe" name="remember">
-                                            <label class="form-check-label text-muted small" for="rememberMe">
-                                                Remember workstation
-                                            </label>
+                                            <input class="form-check-input bg-dark border-secondary" type="checkbox" id="ptRememberMe" name="remember">
+                                            <label class="form-check-label text-muted small" for="ptRememberMe">Remember my device</label>
                                         </div>
                                     </div>
 
                                     <!-- Submit Button -->
-                                    <button type="submit" class="btn btn-cinematic w-100 mb-3 d-flex align-items-center justify-content-center gap-2">
+                                    <button type="submit" class="btn btn-cinematic-patient w-100 mb-3 d-flex align-items-center justify-content-center gap-2">
                                         <i class="fa-solid fa-right-to-bracket"></i>
-                                        <span>Sign In to Health Camp</span>
+                                        <span>Sign In to Patient Portal</span>
                                     </button>
 
-                                    <!-- Switch prompt -->
                                     <div class="text-center pt-2">
-                                        <span class="text-muted small">New to the medical camp? </span>
-                                        <a href="javascript:void(0);" onclick="switchToTab('pills-setup-tab')" class="glass-link small fw-semibold">Set up your account &rarr;</a>
+                                        <span class="text-muted small">New beneficiary? </span>
+                                        <a href="javascript:void(0);" onclick="switchSubTab('patient', 'signup')" class="glass-link small fw-semibold">Create Patient Account &rarr;</a>
                                     </div>
                                 </form>
                             </div>
 
-                            <!-- ============================================== -->
-                            <!-- TAB 2: SET UP NEW ACCOUNT & CUSTOM PASSWORD -->
-                            <!-- ============================================== -->
-                            <div class="tab-pane fade {% if active_tab == 'setup' %}show active{% endif %}" id="pills-setup" role="tabpanel" aria-labelledby="pills-setup-tab">
-                                <form method="POST" action="{{ url_for('setup_account') }}" id="setupForm" onsubmit="return validateSetupForm()">
-                                    <input type="hidden" name="action" value="setup">
-
-                                    <div class="p-2 mb-3 rounded-3 bg-cyan bg-opacity-10 border border-info border-opacity-20 text-info small">
-                                        <i class="fa-solid fa-user-shield me-1"></i> Authorized Medical Officers, Nurses & Volunteers: enter your details and Camp PIN to set your custom password.
-                                    </div>
-
-                                    <!-- Full Legal Name -->
-                                    <div class="glass-input-wrap">
-                                        <label for="setupFullName">Full Name & Title <span class="text-danger">*</span></label>
-                                        <div class="glass-input-group">
-                                            <span class="input-icon"><i class="fa-solid fa-id-card"></i></span>
-                                            <input type="text" class="form-control" id="setupFullName" name="full_name" placeholder="e.g. Dr. Ramesh Patel / Nurse Ananya" required>
-                                        </div>
-                                    </div>
-
-                                    <!-- Username & Role Row -->
+                            <!-- PATIENT REGISTRATION -->
+                            <div id="panelPtSignup" style="display: {% if tab == 'signup' %}block{% else %}none{% endif %};">
+                                <form method="POST" action="{{ url_for('patient_signup') }}" id="ptSignupForm" onsubmit="return validatePtSignup()">
+                                    
+                                    <!-- Name Row -->
                                     <div class="row g-2">
                                         <div class="col-12 col-sm-6">
                                             <div class="glass-input-wrap">
-                                                <label for="setupUsername">Username <span class="text-danger">*</span></label>
+                                                <label for="ptFirstName">First Name <span class="text-danger">*</span></label>
                                                 <div class="glass-input-group">
-                                                    <span class="input-icon"><i class="fa-solid fa-at"></i></span>
-                                                    <input type="text" class="form-control" id="setupUsername" name="username" placeholder="e.g. ramesh.patel" required pattern="[A-Za-z0-9_.-]{3,30}" title="3-30 letters, numbers, dots, or underscores">
+                                                    <span class="input-icon"><i class="fa-solid fa-user"></i></span>
+                                                    <input type="text" class="form-control" id="ptFirstName" name="first_name" placeholder="First Name" required>
                                                 </div>
                                             </div>
                                         </div>
                                         <div class="col-12 col-sm-6">
                                             <div class="glass-input-wrap">
-                                                <label for="setupRole">Operational Role <span class="text-danger">*</span></label>
+                                                <label for="ptLastName">Last Name</label>
                                                 <div class="glass-input-group">
-                                                    <span class="input-icon"><i class="fa-solid fa-user-doctor"></i></span>
-                                                    <select class="form-select" id="setupRole" name="role" required>
-                                                        <option value="Doctor">🩺 Doctor</option>
-                                                        <option value="Volunteer" selected>🤝 Volunteer</option>
-                                                        <option value="Coordinator">📋 Coordinator</option>
+                                                    <span class="input-icon"><i class="fa-solid fa-user-tag"></i></span>
+                                                    <input type="text" class="form-control" id="ptLastName" name="last_name" placeholder="Last Name">
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- DOB & Auto-Calculated Age Row -->
+                                    <div class="row g-2">
+                                        <div class="col-12 col-sm-7">
+                                            <div class="glass-input-wrap">
+                                                <label for="ptDob">Date of Birth <span class="text-danger">*</span></label>
+                                                <div class="glass-input-group">
+                                                    <span class="input-icon"><i class="fa-solid fa-calendar-days"></i></span>
+                                                    <input type="date" class="form-control" id="ptDob" name="dob" required onchange="calculatePatientAge()">
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-12 col-sm-5">
+                                            <div class="glass-input-wrap">
+                                                <label for="ptAge">Calculated Age</label>
+                                                <div class="glass-input-group">
+                                                    <span class="input-icon"><i class="fa-solid fa-hashtag"></i></span>
+                                                    <input type="number" class="form-control" id="ptAge" name="age" placeholder="Age" readonly>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Gender & Blood Group Row -->
+                                    <div class="row g-2">
+                                        <div class="col-12 col-sm-6">
+                                            <div class="glass-input-wrap">
+                                                <label for="ptGender">Gender <span class="text-danger">*</span></label>
+                                                <div class="glass-input-group">
+                                                    <span class="input-icon"><i class="fa-solid fa-venus-mars"></i></span>
+                                                    <select class="form-select" id="ptGender" name="gender" required>
+                                                        <option value="Male" selected>Male</option>
+                                                        <option value="Female">Female</option>
+                                                        <option value="Other">Other</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-12 col-sm-6">
+                                            <div class="glass-input-wrap">
+                                                <label for="ptBloodGroup">Blood Group <span class="text-danger">*</span></label>
+                                                <div class="glass-input-group">
+                                                    <span class="input-icon"><i class="fa-solid fa-droplet text-danger"></i></span>
+                                                    <select class="form-select" id="ptBloodGroup" name="blood_group" required>
+                                                        <option value="O+" selected>O+ (Positive)</option>
+                                                        <option value="O-">O- (Negative)</option>
+                                                        <option value="A+">A+ (Positive)</option>
+                                                        <option value="A-">A- (Negative)</option>
+                                                        <option value="B+">B+ (Positive)</option>
+                                                        <option value="B-">B- (Negative)</option>
+                                                        <option value="AB+">AB+ (Positive)</option>
+                                                        <option value="AB-">AB- (Negative)</option>
                                                     </select>
                                                 </div>
                                             </div>
                                         </div>
                                     </div>
 
-                                    <!-- Camp Access PIN -->
-                                    <div class="glass-input-wrap">
-                                        <div class="d-flex justify-content-between align-items-center mb-1">
-                                            <label for="setupPin" class="mb-0">Camp Authorization PIN <span class="text-danger">*</span></label>
-                                            <span class="text-muted" style="font-size: 0.72rem;">Set by Camp Director</span>
-                                        </div>
-                                        <div class="glass-input-group">
-                                            <span class="input-icon"><i class="fa-solid fa-key"></i></span>
-                                            <input type="password" class="form-control" id="setupPin" name="camp_pin" placeholder="Enter Camp Access PIN (e.g. HEALTH2026)" required autocomplete="off">
-                                        </div>
-                                    </div>
-
-                                    <!-- Custom Password & Strength Meter -->
-                                    <div class="glass-input-wrap">
-                                        <label for="setupPassword">Create Custom Password <span class="text-danger">*</span></label>
-                                        <div class="glass-input-group">
-                                            <span class="input-icon"><i class="fa-solid fa-lock"></i></span>
-                                            <input type="password" class="form-control has-toggle" id="setupPassword" name="password" placeholder="At least 6 characters" required minlength="6" oninput="checkPasswordStrength(this.value, 'setupStrengthBar', 'setupStrengthText')">
-                                            <button type="button" class="btn-eye-toggle" onclick="togglePasswordVisibility('setupPassword', this)" title="Show/Hide Password">
-                                                <i class="fa-solid fa-eye"></i>
-                                            </button>
-                                        </div>
-                                        
-                                        <!-- Real-time Strength Meter -->
-                                        <div class="password-strength-container">
-                                            <div class="strength-meter-bar">
-                                                <div class="strength-step" id="setupStrengthStep1"></div>
-                                                <div class="strength-step" id="setupStrengthStep2"></div>
-                                                <div class="strength-step" id="setupStrengthStep3"></div>
-                                                <div class="strength-step" id="setupStrengthStep4"></div>
+                                    <!-- Allergies & Phone -->
+                                    <div class="row g-2">
+                                        <div class="col-12 col-sm-6">
+                                            <div class="glass-input-wrap">
+                                                <label for="ptAllergies">Known Allergies</label>
+                                                <div class="glass-input-group">
+                                                    <span class="input-icon"><i class="fa-solid fa-shield-virus text-warning"></i></span>
+                                                    <input type="text" class="form-control" id="ptAllergies" name="allergies" placeholder="e.g. Penicillin, Peanuts, None">
+                                                </div>
                                             </div>
-                                            <div class="strength-label">
-                                                <span id="setupStrengthText">Enter a secure password</span>
-                                                <span class="text-muted" style="font-size: 0.72rem;">Min 6 characters</span>
+                                        </div>
+                                        <div class="col-12 col-sm-6">
+                                            <div class="glass-input-wrap">
+                                                <label for="ptPhone">Phone Number <span class="text-danger">*</span></label>
+                                                <div class="glass-input-group">
+                                                    <span class="input-icon"><i class="fa-solid fa-phone"></i></span>
+                                                    <input type="tel" class="form-control" id="ptPhone" name="phone" placeholder="10-digit mobile" required>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
 
-                                    <!-- Confirm Password -->
-                                    <div class="glass-input-wrap">
-                                        <label for="setupConfirmPassword">Confirm Password <span class="text-danger">*</span></label>
-                                        <div class="glass-input-group">
-                                            <span class="input-icon"><i class="fa-solid fa-shield-check"></i></span>
-                                            <input type="password" class="form-control has-toggle" id="setupConfirmPassword" name="confirm_password" placeholder="Re-type your password" required minlength="6" oninput="checkPasswordMatch('setupPassword', 'setupConfirmPassword', 'setupMatchText')">
-                                            <button type="button" class="btn-eye-toggle" onclick="togglePasswordVisibility('setupConfirmPassword', this)" title="Show/Hide Password">
-                                                <i class="fa-solid fa-eye"></i>
-                                            </button>
+                                    <!-- Cascading Location: Country -> State -> City -->
+                                    <div class="row g-2">
+                                        <div class="col-12 col-sm-4">
+                                            <div class="glass-input-wrap">
+                                                <label for="ptCountry">Country <span class="text-danger">*</span></label>
+                                                <div class="glass-input-group">
+                                                    <span class="input-icon"><i class="fa-solid fa-globe"></i></span>
+                                                    <select class="form-select" id="ptCountry" name="country">
+                                                        <option value="India" selected>India</option>
+                                                    </select>
+                                                </div>
+                                            </div>
                                         </div>
-                                        <small id="setupMatchText" class="d-block mt-1" style="font-size: 0.75rem;"></small>
+                                        <div class="col-12 col-sm-4">
+                                            <div class="glass-input-wrap">
+                                                <label for="ptState">State <span class="text-danger">*</span></label>
+                                                <div class="glass-input-group">
+                                                    <span class="input-icon"><i class="fa-solid fa-map-location-dot"></i></span>
+                                                    <select class="form-select" id="ptState" name="state" required onchange="updateCities()">
+                                                        <option value="">Select State</option>
+                                                        <option value="Andhra Pradesh">Andhra Pradesh</option>
+                                                        <option value="Arunachal Pradesh">Arunachal Pradesh</option>
+                                                        <option value="Assam">Assam</option>
+                                                        <option value="Bihar">Bihar</option>
+                                                        <option value="Chhattisgarh">Chhattisgarh</option>
+                                                        <option value="Goa">Goa</option>
+                                                        <option value="Gujarat">Gujarat</option>
+                                                        <option value="Haryana">Haryana</option>
+                                                        <option value="Himachal Pradesh">Himachal Pradesh</option>
+                                                        <option value="Jharkhand">Jharkhand</option>
+                                                        <option value="Karnataka">Karnataka</option>
+                                                        <option value="Kerala">Kerala</option>
+                                                        <option value="Madhya Pradesh">Madhya Pradesh</option>
+                                                        <option value="Maharashtra" selected>Maharashtra</option>
+                                                        <option value="Manipur">Manipur</option>
+                                                        <option value="Meghalaya">Meghalaya</option>
+                                                        <option value="Mizoram">Mizoram</option>
+                                                        <option value="Nagaland">Nagaland</option>
+                                                        <option value="Odisha">Odisha</option>
+                                                        <option value="Punjab">Punjab</option>
+                                                        <option value="Rajasthan">Rajasthan</option>
+                                                        <option value="Sikkim">Sikkim</option>
+                                                        <option value="Tamil Nadu">Tamil Nadu</option>
+                                                        <option value="Telangana">Telangana</option>
+                                                        <option value="Tripura">Tripura</option>
+                                                        <option value="Uttar Pradesh">Uttar Pradesh</option>
+                                                        <option value="Uttarakhand">Uttarakhand</option>
+                                                        <option value="West Bengal">West Bengal</option>
+                                                        <option value="Delhi">Delhi</option>
+                                                        <option value="Chandigarh">Chandigarh</option>
+                                                        <option value="Jammu and Kashmir">Jammu and Kashmir</option>
+                                                        <option value="Ladakh">Ladakh</option>
+                                                        <option value="Puducherry">Puducherry</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-12 col-sm-4">
+                                            <div class="glass-input-wrap">
+                                                <label for="ptCity">City <span class="text-danger">*</span></label>
+                                                <div class="glass-input-group">
+                                                    <span class="input-icon"><i class="fa-solid fa-city"></i></span>
+                                                    <select class="form-select" id="ptCity" name="city" required>
+                                                        <option value="Nagpur" selected>Nagpur</option>
+                                                        <option value="Mumbai">Mumbai</option>
+                                                        <option value="Pune">Pune</option>
+                                                        <option value="Nashik">Nashik</option>
+                                                        <option value="Aurangabad">Aurangabad</option>
+                                                        <option value="Other">Other</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
 
-                                    <!-- Submit Button -->
-                                    <button type="submit" class="btn btn-cinematic w-100 mb-3 d-flex align-items-center justify-content-center gap-2">
-                                        <i class="fa-solid fa-circle-check"></i>
-                                        <span>Create Account & Set Password</span>
+                                    <!-- Address Line -->
+                                    <div class="glass-input-wrap">
+                                        <label for="ptAddress">Address / Ward / Village</label>
+                                        <div class="glass-input-group">
+                                            <span class="input-icon"><i class="fa-solid fa-house-medical"></i></span>
+                                            <input type="text" class="form-control" id="ptAddress" name="address" placeholder="e.g. Ward 12, Kalmeshwar, Nagpur">
+                                        </div>
+                                    </div>
+
+                                    <!-- Gmail / Email -->
+                                    <div class="glass-input-wrap">
+                                        <label for="ptEmail">Gmail / Email Address <span class="text-danger">*</span></label>
+                                        <div class="glass-input-group">
+                                            <span class="input-icon"><i class="fa-solid fa-envelope"></i></span>
+                                            <input type="email" class="form-control" id="ptEmail" name="email" placeholder="e.g. yourname@gmail.com" required>
+                                        </div>
+                                    </div>
+
+                                    <!-- Password & Confirm Password -->
+                                    <div class="row g-2">
+                                        <div class="col-12 col-sm-6">
+                                            <div class="glass-input-wrap">
+                                                <label for="ptPassword">Create Password <span class="text-danger">*</span></label>
+                                                <div class="glass-input-group">
+                                                    <span class="input-icon"><i class="fa-solid fa-lock"></i></span>
+                                                    <input type="password" class="form-control has-toggle" id="ptPassword" name="password" placeholder="Min 6 chars" required minlength="6" oninput="checkPasswordStrength(this.value, 'ptStrengthBar', 'ptStrengthText')">
+                                                    <button type="button" class="btn-eye-toggle" onclick="togglePasswordVisibility('ptPassword', this)">
+                                                        <i class="fa-solid fa-eye"></i>
+                                                    </button>
+                                                </div>
+                                                <div class="password-strength-container">
+                                                    <div class="strength-meter-bar">
+                                                        <div class="strength-step" id="ptStrengthStep1"></div>
+                                                        <div class="strength-step" id="ptStrengthStep2"></div>
+                                                        <div class="strength-step" id="ptStrengthStep3"></div>
+                                                        <div class="strength-step" id="ptStrengthStep4"></div>
+                                                    </div>
+                                                    <div class="strength-label">
+                                                        <span id="ptStrengthText" class="text-muted">Enter password</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-12 col-sm-6">
+                                            <div class="glass-input-wrap">
+                                                <label for="ptConfirmPassword">Confirm Password <span class="text-danger">*</span></label>
+                                                <div class="glass-input-group">
+                                                    <span class="input-icon"><i class="fa-solid fa-shield-check"></i></span>
+                                                    <input type="password" class="form-control has-toggle" id="ptConfirmPassword" name="confirm_password" placeholder="Re-type password" required minlength="6" oninput="checkPasswordMatch('ptPassword', 'ptConfirmPassword', 'ptMatchText')">
+                                                    <button type="button" class="btn-eye-toggle" onclick="togglePasswordVisibility('ptConfirmPassword', this)">
+                                                        <i class="fa-solid fa-eye"></i>
+                                                    </button>
+                                                </div>
+                                                <small id="ptMatchText" class="d-block mt-1" style="font-size: 0.72rem;"></small>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- OTP Notice Badge -->
+                                    <div class="p-2 mb-3 rounded-3 bg-info bg-opacity-10 border border-info border-opacity-20 text-info small">
+                                        <i class="fa-solid fa-envelope-circle-check me-1"></i> A 6-digit verification OTP will be sent to your email to activate your account.
+                                    </div>
+
+                                    <!-- Submit Button (NO PIN) -->
+                                    <button type="submit" class="btn btn-cinematic-patient w-100 mb-3 d-flex align-items-center justify-content-center gap-2">
+                                        <i class="fa-solid fa-user-plus"></i>
+                                        <span>Register & Get 6-Digit Verification OTP</span>
                                     </button>
 
-                                    <!-- Switch prompt -->
                                     <div class="text-center pt-1">
-                                        <span class="text-muted small">Already have an account? </span>
-                                        <a href="javascript:void(0);" onclick="switchToTab('pills-login-tab')" class="glass-link small fw-semibold">Sign In here &rarr;</a>
-                                    </div>
-                                </form>
-                            </div>
-
-                            <!-- ============================================== -->
-                            <!-- TAB 3: RESET / CHANGE PASSWORD -->
-                            <!-- ============================================== -->
-                            <div class="tab-pane fade {% if active_tab == 'reset' %}show active{% endif %}" id="pills-reset" role="tabpanel" aria-labelledby="pills-reset-tab">
-                                <form method="POST" action="{{ url_for('reset_password') }}" id="resetForm" onsubmit="return validateResetForm()">
-                                    <input type="hidden" name="action" value="reset">
-
-                                    <div class="p-2 mb-3 rounded-3 bg-warning bg-opacity-10 border border-warning border-opacity-20 text-warning small">
-                                        <i class="fa-solid fa-key me-1"></i> Authorized Password Reset: Provide your registered username, Camp Access PIN, and set your new password.
-                                    </div>
-
-                                    <!-- Username -->
-                                    <div class="glass-input-wrap">
-                                        <label for="resetUsername">Registered Username <span class="text-danger">*</span></label>
-                                        <div class="glass-input-group">
-                                            <span class="input-icon"><i class="fa-solid fa-user"></i></span>
-                                            <input type="text" class="form-control" id="resetUsername" name="username" placeholder="Enter your staff username" required>
-                                        </div>
-                                    </div>
-
-                                    <!-- Camp Access PIN -->
-                                    <div class="glass-input-wrap">
-                                        <div class="d-flex justify-content-between align-items-center mb-1">
-                                            <label for="resetPin" class="mb-0">Camp Authorization PIN <span class="text-danger">*</span></label>
-                                            <span class="text-muted" style="font-size: 0.72rem;">Authorization verification</span>
-                                        </div>
-                                        <div class="glass-input-group">
-                                            <span class="input-icon"><i class="fa-solid fa-shield-halved"></i></span>
-                                            <input type="password" class="form-control" id="resetPin" name="camp_pin" placeholder="Enter Camp Access PIN (e.g. HEALTH2026)" required autocomplete="off">
-                                        </div>
-                                    </div>
-
-                                    <!-- New Custom Password & Strength Meter -->
-                                    <div class="glass-input-wrap">
-                                        <label for="resetNewPassword">New Secure Password <span class="text-danger">*</span></label>
-                                        <div class="glass-input-group">
-                                            <span class="input-icon"><i class="fa-solid fa-lock"></i></span>
-                                            <input type="password" class="form-control has-toggle" id="resetNewPassword" name="new_password" placeholder="At least 6 characters" required minlength="6" oninput="checkPasswordStrength(this.value, 'resetStrengthBar', 'resetStrengthText')">
-                                            <button type="button" class="btn-eye-toggle" onclick="togglePasswordVisibility('resetNewPassword', this)" title="Show/Hide Password">
-                                                <i class="fa-solid fa-eye"></i>
-                                            </button>
-                                        </div>
-                                        
-                                        <!-- Real-time Strength Meter -->
-                                        <div class="password-strength-container">
-                                            <div class="strength-meter-bar">
-                                                <div class="strength-step" id="resetStrengthStep1"></div>
-                                                <div class="strength-step" id="resetStrengthStep2"></div>
-                                                <div class="strength-step" id="resetStrengthStep3"></div>
-                                                <div class="strength-step" id="resetStrengthStep4"></div>
-                                            </div>
-                                            <div class="strength-label">
-                                                <span id="resetStrengthText">Enter a new secure password</span>
-                                                <span class="text-muted" style="font-size: 0.72rem;">Min 6 characters</span>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <!-- Confirm New Password -->
-                                    <div class="glass-input-wrap">
-                                        <label for="resetConfirmPassword">Confirm New Password <span class="text-danger">*</span></label>
-                                        <div class="glass-input-group">
-                                            <span class="input-icon"><i class="fa-solid fa-shield-check"></i></span>
-                                            <input type="password" class="form-control has-toggle" id="resetConfirmPassword" name="confirm_password" placeholder="Re-type new password" required minlength="6" oninput="checkPasswordMatch('resetNewPassword', 'resetConfirmPassword', 'resetMatchText')">
-                                            <button type="button" class="btn-eye-toggle" onclick="togglePasswordVisibility('resetConfirmPassword', this)" title="Show/Hide Password">
-                                                <i class="fa-solid fa-eye"></i>
-                                            </button>
-                                        </div>
-                                        <small id="resetMatchText" class="d-block mt-1" style="font-size: 0.75rem;"></small>
-                                    </div>
-
-                                    <!-- Submit Button -->
-                                    <button type="submit" class="btn btn-cinematic w-100 mb-3 d-flex align-items-center justify-content-center gap-2">
-                                        <i class="fa-solid fa-lock-open"></i>
-                                        <span>Update Password & Sign In</span>
-                                    </button>
-
-                                    <!-- Switch prompt -->
-                                    <div class="text-center pt-1">
-                                        <span class="text-muted small">Remembered your password? </span>
-                                        <a href="javascript:void(0);" onclick="switchToTab('pills-login-tab')" class="glass-link small fw-semibold">Back to Sign In &rarr;</a>
+                                        <span class="text-muted small">Already registered? </span>
+                                        <a href="javascript:void(0);" onclick="switchSubTab('patient', 'signin')" class="glass-link small fw-semibold">Sign In here &rarr;</a>
                                     </div>
                                 </form>
                             </div>
 
                         </div>
 
-                        <!-- Card Footer Links -->
+                        <!-- ============================================================= -->
+                        <!-- PORTAL 2: DOCTOR & CLINICAL STAFF PORTAL -->
+                        <!-- ============================================================= -->
+                        <div id="sectionDoctorPortal" style="display: {% if portal == 'doctor' %}block{% else %}none{% endif %};">
+
+                            <!-- Sub Tab Selector -->
+                            <div class="sub-nav-pills">
+                                <button type="button" class="sub-nav-link {% if tab != 'signup' %}active{% endif %}" id="subTabDocSignin" onclick="switchSubTab('doctor', 'signin')">
+                                    <i class="fa-solid fa-stethoscope me-1"></i> Doctor Sign In
+                                </button>
+                                <button type="button" class="sub-nav-link {% if tab == 'signup' %}active{% endif %}" id="subTabDocSignup" onclick="switchSubTab('doctor', 'signup')">
+                                    <i class="fa-solid fa-user-doctor me-1"></i> Create Doctor Account
+                                </button>
+                            </div>
+
+                            <!-- DOCTOR SIGN IN -->
+                            <div id="panelDocSignin" style="display: {% if tab != 'signup' %}block{% else %}none{% endif %};">
+                                <form method="POST" action="{{ url_for('doctor_login') }}">
+                                    <!-- Email / Username -->
+                                    <div class="glass-input-wrap">
+                                        <label for="docLoginUser">Doctor Email / Username</label>
+                                        <div class="glass-input-group">
+                                            <span class="input-icon"><i class="fa-solid fa-user-doctor"></i></span>
+                                            <input type="text" class="form-control" id="docLoginUser" name="username" placeholder="Medical Email or Username" required autofocus autocomplete="username">
+                                        </div>
+                                    </div>
+
+                                    <!-- Password with Eye Toggle -->
+                                    <div class="glass-input-wrap">
+                                        <label for="docLoginPassword">Doctor Password</label>
+                                        <div class="glass-input-group">
+                                            <span class="input-icon"><i class="fa-solid fa-lock"></i></span>
+                                            <input type="password" class="form-control has-toggle" id="docLoginPassword" name="password" placeholder="Enter password" required autocomplete="current-password">
+                                            <button type="button" class="btn-eye-toggle" onclick="togglePasswordVisibility('docLoginPassword', this)">
+                                                <i class="fa-solid fa-eye"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <!-- Remember Me Checkbox -->
+                                    <div class="d-flex justify-content-between align-items-center mb-3">
+                                        <div class="form-check">
+                                            <input class="form-check-input bg-dark border-secondary" type="checkbox" id="docRememberMe" name="remember">
+                                            <label class="form-check-label text-muted small" for="docRememberMe">Remember workstation</label>
+                                        </div>
+                                    </div>
+
+                                    <!-- Submit Button -->
+                                    <button type="submit" class="btn btn-cinematic-doctor w-100 mb-3 d-flex align-items-center justify-content-center gap-2">
+                                        <i class="fa-solid fa-stethoscope"></i>
+                                        <span>Sign In to Clinical Dashboard</span>
+                                    </button>
+
+                                    <div class="text-center pt-2">
+                                        <span class="text-muted small">New medical officer? </span>
+                                        <a href="javascript:void(0);" onclick="switchSubTab('doctor', 'signup')" class="glass-link small fw-semibold">Register Doctor Account &rarr;</a>
+                                    </div>
+                                </form>
+                            </div>
+
+                            <!-- DOCTOR REGISTRATION (NO PIN) -->
+                            <div id="panelDocSignup" style="display: {% if tab == 'signup' %}block{% else %}none{% endif %};">
+                                <form method="POST" action="{{ url_for('doctor_signup') }}" id="docSignupForm" onsubmit="return validateDocSignup()">
+
+                                    <!-- Full Name -->
+                                    <div class="glass-input-wrap">
+                                        <label for="docFullName">Doctor Full Name <span class="text-danger">*</span></label>
+                                        <div class="glass-input-group">
+                                            <span class="input-icon"><i class="fa-solid fa-user-doctor"></i></span>
+                                            <input type="text" class="form-control" id="docFullName" name="full_name" placeholder="e.g. Dr. Priya Sharma" required>
+                                        </div>
+                                    </div>
+
+                                    <!-- Medical License & Specialization Row -->
+                                    <div class="row g-2">
+                                        <div class="col-12 col-sm-6">
+                                            <div class="glass-input-wrap">
+                                                <label for="docLicense">Medical License / Reg. ID <span class="text-danger">*</span></label>
+                                                <div class="glass-input-group">
+                                                    <span class="input-icon"><i class="fa-solid fa-id-card"></i></span>
+                                                    <input type="text" class="form-control" id="docLicense" name="license_number" placeholder="e.g. MCI-2024-89712" required>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-12 col-sm-6">
+                                            <div class="glass-input-wrap">
+                                                <label for="docSpecialization">Specialization <span class="text-danger">*</span></label>
+                                                <div class="glass-input-group">
+                                                    <span class="input-icon"><i class="fa-solid fa-stethoscope"></i></span>
+                                                    <select class="form-select" id="docSpecialization" name="specialization" required>
+                                                        <option value="General Medicine" selected>General Medicine</option>
+                                                        <option value="Cardiology">Cardiology</option>
+                                                        <option value="Pediatrics">Pediatrics</option>
+                                                        <option value="Family Medicine">Family Medicine</option>
+                                                        <option value="Emergency Medicine">Emergency Medicine</option>
+                                                        <option value="Orthopedics">Orthopedics</option>
+                                                        <option value="Gynecology">Gynecology</option>
+                                                        <option value="Community Medicine">Community Medicine</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Qualification & Phone Row -->
+                                    <div class="row g-2">
+                                        <div class="col-12 col-sm-6">
+                                            <div class="glass-input-wrap">
+                                                <label for="docQualification">Qualification <span class="text-danger">*</span></label>
+                                                <div class="glass-input-group">
+                                                    <span class="input-icon"><i class="fa-solid fa-graduation-cap"></i></span>
+                                                    <input type="text" class="form-control" id="docQualification" name="qualification" placeholder="e.g. MBBS, MD" required>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-12 col-sm-6">
+                                            <div class="glass-input-wrap">
+                                                <label for="docPhone">Contact Phone</label>
+                                                <div class="glass-input-group">
+                                                    <span class="input-icon"><i class="fa-solid fa-phone"></i></span>
+                                                    <input type="tel" class="form-control" id="docPhone" name="phone" placeholder="Mobile / Clinic Phone">
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Medical Email -->
+                                    <div class="glass-input-wrap">
+                                        <label for="docEmail">Medical Email Address <span class="text-danger">*</span></label>
+                                        <div class="glass-input-group">
+                                            <span class="input-icon"><i class="fa-solid fa-envelope"></i></span>
+                                            <input type="email" class="form-control" id="docEmail" name="email" placeholder="e.g. doctor@hospital.org" required>
+                                        </div>
+                                    </div>
+
+                                    <!-- Password & Confirm Password -->
+                                    <div class="row g-2">
+                                        <div class="col-12 col-sm-6">
+                                            <div class="glass-input-wrap">
+                                                <label for="docPassword">Create Password <span class="text-danger">*</span></label>
+                                                <div class="glass-input-group">
+                                                    <span class="input-icon"><i class="fa-solid fa-lock"></i></span>
+                                                    <input type="password" class="form-control has-toggle" id="docPassword" name="password" placeholder="Min 6 chars" required minlength="6" oninput="checkPasswordStrength(this.value, 'docStrengthBar', 'docStrengthText')">
+                                                    <button type="button" class="btn-eye-toggle" onclick="togglePasswordVisibility('docPassword', this)">
+                                                        <i class="fa-solid fa-eye"></i>
+                                                    </button>
+                                                </div>
+                                                <div class="password-strength-container">
+                                                    <div class="strength-meter-bar">
+                                                        <div class="strength-step" id="docStrengthStep1"></div>
+                                                        <div class="strength-step" id="docStrengthStep2"></div>
+                                                        <div class="strength-step" id="docStrengthStep3"></div>
+                                                        <div class="strength-step" id="docStrengthStep4"></div>
+                                                    </div>
+                                                    <div class="strength-label">
+                                                        <span id="docStrengthText" class="text-muted">Enter password</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-12 col-sm-6">
+                                            <div class="glass-input-wrap">
+                                                <label for="docConfirmPassword">Confirm Password <span class="text-danger">*</span></label>
+                                                <div class="glass-input-group">
+                                                    <span class="input-icon"><i class="fa-solid fa-shield-check"></i></span>
+                                                    <input type="password" class="form-control has-toggle" id="docConfirmPassword" name="confirm_password" placeholder="Re-type password" required minlength="6" oninput="checkPasswordMatch('docPassword', 'docConfirmPassword', 'docMatchText')">
+                                                    <button type="button" class="btn-eye-toggle" onclick="togglePasswordVisibility('docConfirmPassword', this)">
+                                                        <i class="fa-solid fa-eye"></i>
+                                                    </button>
+                                                </div>
+                                                <small id="docMatchText" class="d-block mt-1" style="font-size: 0.72rem;"></small>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Submit Button (NO PIN) -->
+                                    <button type="submit" class="btn btn-cinematic-doctor w-100 mb-3 d-flex align-items-center justify-content-center gap-2">
+                                        <i class="fa-solid fa-user-doctor"></i>
+                                        <span>Create Doctor Account & Enter Dashboard</span>
+                                    </button>
+
+                                    <div class="text-center pt-1">
+                                        <span class="text-muted small">Already have a medical account? </span>
+                                        <a href="javascript:void(0);" onclick="switchSubTab('doctor', 'signin')" class="glass-link small fw-semibold">Sign In here &rarr;</a>
+                                    </div>
+                                </form>
+                            </div>
+
+                        </div>
+
+                        <!-- Card Footer -->
                         <div class="mt-4 pt-3 border-top border-white border-opacity-10 text-center">
                             <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 text-muted" style="font-size: 0.78rem;">
                                 <span><i class="fa-solid fa-laptop-medical me-1 text-info"></i> Health Camp v3.2</span>
-                                <span>Emergency 108 Dispatch Active</span>
+                                <span><i class="fa-solid fa-shield-halved text-success me-1"></i> Zero-Knowledge Patient Privacy</span>
                             </div>
                         </div>
 
@@ -894,16 +1104,112 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
     <script>
-        // Tab Switcher Utility
-        function switchToTab(tabId) {
-            const triggerEl = document.getElementById(tabId);
-            if (triggerEl) {
-                const tabInstance = bootstrap.Tab.getOrCreateInstance(triggerEl);
-                tabInstance.show();
+        // Portal Switcher (Patient vs Doctor)
+        function switchPortal(portal) {
+            const btnPatient = document.getElementById('btnPortalPatient');
+            const btnDoctor = document.getElementById('btnPortalDoctor');
+            const secPatient = document.getElementById('sectionPatientPortal');
+            const secDoctor = document.getElementById('sectionDoctorPortal');
+
+            if (portal === 'doctor') {
+                btnPatient.className = 'portal-btn';
+                btnDoctor.className = 'portal-btn active doctor-active';
+                secPatient.style.display = 'none';
+                secDoctor.style.display = 'block';
+            } else {
+                btnDoctor.className = 'portal-btn';
+                btnPatient.className = 'portal-btn active patient-active';
+                secDoctor.style.display = 'none';
+                secPatient.style.display = 'block';
             }
         }
 
-        // Show/Hide Password Eye Toggle
+        // Sub Tab Switcher (Sign In vs Sign Up)
+        function switchSubTab(portal, mode) {
+            if (portal === 'patient') {
+                const tabSignin = document.getElementById('subTabPtSignin');
+                const tabSignup = document.getElementById('subTabPtSignup');
+                const pnlSignin = document.getElementById('panelPtSignin');
+                const pnlSignup = document.getElementById('panelPtSignup');
+
+                if (mode === 'signup') {
+                    tabSignin.classList.remove('active');
+                    tabSignup.classList.add('active');
+                    pnlSignin.style.display = 'none';
+                    pnlSignup.style.display = 'block';
+                } else {
+                    tabSignup.classList.remove('active');
+                    tabSignin.classList.add('active');
+                    pnlSignup.style.display = 'none';
+                    pnlSignin.style.display = 'block';
+                }
+            } else {
+                const tabSignin = document.getElementById('subTabDocSignin');
+                const tabSignup = document.getElementById('subTabDocSignup');
+                const pnlSignin = document.getElementById('panelDocSignin');
+                const pnlSignup = document.getElementById('panelDocSignup');
+
+                if (mode === 'signup') {
+                    tabSignin.classList.remove('active');
+                    tabSignup.classList.add('active');
+                    pnlSignin.style.display = 'none';
+                    pnlSignup.style.display = 'block';
+                } else {
+                    tabSignup.classList.remove('active');
+                    tabSignin.classList.add('active');
+                    pnlSignup.style.display = 'none';
+                    pnlSignin.style.display = 'block';
+                }
+            }
+        }
+
+        // Calculate Age from Date of Birth
+        function calculatePatientAge() {
+            const dobVal = document.getElementById('ptDob').value;
+            if (!dobVal) return;
+            const dob = new Date(dobVal);
+            const today = new Date();
+            let age = today.getFullYear() - dob.getFullYear();
+            const m = today.getMonth() - dob.getMonth();
+            if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) {
+                age--;
+            }
+            if (age >= 0 && age <= 125) {
+                document.getElementById('ptAge').value = age;
+            }
+        }
+
+        // Cascading State -> City Population
+        const stateCities = {
+            "Maharashtra": ["Nagpur", "Mumbai", "Pune", "Nashik", "Aurangabad", "Thane", "Amravati", "Kolhapur", "Other"],
+            "Karnataka": ["Bengaluru", "Mysuru", "Hubballi", "Mangaluru", "Belagavi", "Kalaburagi", "Davanagere", "Other"],
+            "Delhi": ["New Delhi", "North Delhi", "South Delhi", "West Delhi", "Central Delhi", "Other"],
+            "Gujarat": ["Ahmedabad", "Surat", "Vadodara", "Rajkot", "Bhavnagar", "Jamnagar", "Other"],
+            "Madhya Pradesh": ["Bhopal", "Indore", "Jabalpur", "Gwalior", "Ujjain", "Sagar", "Other"],
+            "Uttar Pradesh": ["Lucknow", "Kanpur", "Varanasi", "Agra", "Noida", "Prayagraj", "Meerut", "Other"],
+            "Tamil Nadu": ["Chennai", "Coimbatore", "Madurai", "Tiruchirappalli", "Salem", "Tirunelveli", "Other"],
+            "Telangana": ["Hyderabad", "Warangal", "Nizamabad", "Karimnagar", "Khammam", "Other"],
+            "Rajasthan": ["Jaipur", "Jodhpur", "Kota", "Bikaner", "Ajmer", "Udaipur", "Other"],
+            "West Bengal": ["Kolkata", "Howrah", "Durgapur", "Asansol", "Siliguri", "Other"],
+            "Bihar": ["Patna", "Gaya", "Bhagalpur", "Muzaffarpur", "Purnia", "Darbhanga", "Other"],
+            "Kerala": ["Thiruvananthapuram", "Kochi", "Kozhikode", "Kollam", "Thrissur", "Other"]
+        };
+
+        function updateCities() {
+            const state = document.getElementById('ptState').value;
+            const citySelect = document.getElementById('ptCity');
+            citySelect.innerHTML = '';
+
+            const cities = stateCities[state] || ["District Headquarters", "Central Town", "Rural Ward", "Other"];
+            cities.forEach(c => {
+                const opt = document.createElement('option');
+                opt.value = c;
+                opt.textContent = c;
+                citySelect.appendChild(opt);
+            });
+        }
+
+        // Toggle Password Visibility
         function togglePasswordVisibility(inputId, btnEl) {
             const input = document.getElementById(inputId);
             if (!input) return;
@@ -922,24 +1228,18 @@
         // Real-time Password Strength Meter
         function checkPasswordStrength(password, barIdPrefix, textId) {
             const textEl = document.getElementById(textId);
-            const prefix = textId.startsWith('setup') ? 'setup' : 'reset';
+            const prefix = textId.startsWith('pt') ? 'pt' : 'doc';
             const step1 = document.getElementById(prefix + 'StrengthStep1');
             const step2 = document.getElementById(prefix + 'StrengthStep2');
             const step3 = document.getElementById(prefix + 'StrengthStep3');
             const step4 = document.getElementById(prefix + 'StrengthStep4');
 
             const steps = [step1, step2, step3, step4];
-
-            // Reset steps
-            steps.forEach(s => {
-                if (s) {
-                    s.style.background = 'rgba(255, 255, 255, 0.12)';
-                }
-            });
+            steps.forEach(s => { if (s) s.style.background = 'rgba(255, 255, 255, 0.12)'; });
 
             if (!password || password.length === 0) {
                 if (textEl) {
-                    textEl.textContent = 'Enter a secure password';
+                    textEl.textContent = 'Enter password';
                     textEl.className = 'text-muted';
                 }
                 return;
@@ -952,40 +1252,24 @@
             if (/[^A-Za-z0-9]/.test(password) || password.length >= 12) score += 1;
 
             if (score <= 1) {
-                // Weak
                 if (step1) step1.style.background = '#ef4444';
-                if (textEl) {
-                    textEl.textContent = 'Weak password (Add numbers/special characters)';
-                    textEl.className = 'text-danger fw-semibold';
-                }
+                if (textEl) { textEl.textContent = 'Weak password'; textEl.className = 'text-danger fw-semibold'; }
             } else if (score === 2) {
-                // Medium
                 if (step1) step1.style.background = '#f59e0b';
                 if (step2) step2.style.background = '#f59e0b';
-                if (textEl) {
-                    textEl.textContent = 'Medium password (Good, add special chars to strengthen)';
-                    textEl.className = 'text-warning fw-semibold';
-                }
+                if (textEl) { textEl.textContent = 'Medium password'; textEl.className = 'text-warning fw-semibold'; }
             } else if (score === 3) {
-                // Strong
                 if (step1) step1.style.background = '#10b981';
                 if (step2) step2.style.background = '#10b981';
                 if (step3) step3.style.background = '#10b981';
-                if (textEl) {
-                    textEl.textContent = 'Strong password (Secure)';
-                    textEl.className = 'text-success fw-semibold';
-                }
+                if (textEl) { textEl.textContent = 'Strong password'; textEl.className = 'text-success fw-semibold'; }
             } else {
-                // Very Strong
                 steps.forEach(s => { if (s) s.style.background = '#06b6d4'; });
-                if (textEl) {
-                    textEl.textContent = 'Very Strong password (Excellent security)';
-                    textEl.className = 'text-info fw-semibold';
-                }
+                if (textEl) { textEl.textContent = 'Very strong password'; textEl.className = 'text-info fw-semibold'; }
             }
         }
 
-        // Real-time Confirm Password Match Check
+        // Password Match Check
         function checkPasswordMatch(pwdId, confirmId, matchTextId) {
             const pwd = document.getElementById(pwdId).value;
             const confirm = document.getElementById(confirmId).value;
@@ -995,9 +1279,8 @@
                 textEl.textContent = '';
                 return;
             }
-
             if (pwd === confirm) {
-                textEl.textContent = '✓ Passwords match perfectly';
+                textEl.textContent = '✓ Passwords match';
                 textEl.className = 'text-success fw-semibold small mt-1';
             } else {
                 textEl.textContent = '✗ Passwords do not match';
@@ -1005,12 +1288,12 @@
             }
         }
 
-        // Form Validation on Submit
-        function validateSetupForm() {
-            const pwd = document.getElementById('setupPassword').value;
-            const confirm = document.getElementById('setupConfirmPassword').value;
+        // Form Validations
+        function validatePtSignup() {
+            const pwd = document.getElementById('ptPassword').value;
+            const confirm = document.getElementById('ptConfirmPassword').value;
             if (pwd !== confirm) {
-                alert('Passwords do not match. Please verify your password confirmation.');
+                alert('Passwords do not match. Please verify.');
                 return false;
             }
             if (pwd.length < 6) {
@@ -1020,15 +1303,15 @@
             return true;
         }
 
-        function validateResetForm() {
-            const pwd = document.getElementById('resetNewPassword').value;
-            const confirm = document.getElementById('resetConfirmPassword').value;
+        function validateDocSignup() {
+            const pwd = document.getElementById('docPassword').value;
+            const confirm = document.getElementById('docConfirmPassword').value;
             if (pwd !== confirm) {
-                alert('Passwords do not match. Please verify your new password confirmation.');
+                alert('Passwords do not match. Please verify.');
                 return false;
             }
             if (pwd.length < 6) {
-                alert('New password must be at least 6 characters long.');
+                alert('Password must be at least 6 characters long.');
                 return false;
             }
             return true;

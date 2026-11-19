@@ -834,7 +834,9 @@ def api_patient_history(patient_uid_or_phone):
     })
 
 
-def init_medicine_inventory_seed(app):
+def init_medicine_inventory_seed(app, force=False):
+    if not force:
+        return
     """
     Seed initial MedicineInventory records from existing Medicine catalog if empty.
     """

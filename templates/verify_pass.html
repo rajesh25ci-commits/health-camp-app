@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verified Health Pass - {{ patient.patient_uid }}</title>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@600;700&family=JetBrains+Mono:wght@600;700&display=swap" rel="stylesheet">
+
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- FontAwesome 6 Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        body {
+            background-color: #f1f5f9;
+            font-family: 'Inter', sans-serif;
+            color: #1e293b;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1.5rem 1rem;
+        }
+
+        .pass-card {
+            background: #ffffff;
+            border-radius: 24px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.08);
+            border: 1px solid #e2e8f0;
+            max-width: 520px;
+            width: 100%;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .pass-header {
+            background: linear-gradient(135deg, #1e3a8a 0%, #0f172a 100%);
+            color: #ffffff;
+            padding: 1.75rem 1.5rem;
+            position: relative;
+        }
+
+        .pass-header::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, #06b6d4, #10b981, #3b82f6);
+        }
+
+        .id-badge {
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 700;
+            letter-spacing: 0.1em;
+            background: rgba(6, 182, 212, 0.18);
+            color: #38bdf8;
+            border: 1px solid rgba(6, 182, 212, 0.4);
+            padding: 0.35rem 0.85rem;
+            border-radius: 999px;
+            font-size: 0.95rem;
+            display: inline-block;
+        }
+
+        .info-pill {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 0.75rem 1rem;
+        }
+
+        .info-label {
+            font-size: 0.72rem;
+            text-transform: uppercase;
+            font-weight: 600;
+            color: #64748b;
+            margin-bottom: 0.2rem;
+        }
+
+        .info-value {
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: #0f172a;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="pass-card">
+        
+        <!-- Header -->
+        <div class="pass-header text-center">
+            <div class="d-inline-flex align-items-center justify-content-center bg-white text-danger rounded-circle p-2 mb-2" style="width: 44px; height: 44px;">
+                <i class="fas fa-heart-pulse fs-4"></i>
+            </div>
+            <h5 class="fw-bold mb-1" style="font-family: 'Poppins', sans-serif;">Smart Community Health Camp</h5>
+            <div class="small text-white-50 mb-3">OFFICIAL VERIFIED DIGITAL HEALTH PASS</div>
+
+            <div class="d-flex align-items-center justify-content-center gap-2">
+                <span class="id-badge">ID: {{ patient.patient_uid }}</span>
+                <span class="badge bg-success text-white px-2 py-1 rounded-pill" style="font-size: 0.75rem;">
+                    <i class="fas fa-circle-check me-1"></i> VERIFIED
+                </span>
+            </div>
+        </div>
+
+        <div class="p-4">
+
+            <!-- Patient Avatar & Core Demographics -->
+            <div class="d-flex align-items-center gap-3 mb-4 pb-3 border-bottom">
+                <img src="{{ photo_url }}" alt="{{ patient.name }}" class="rounded-circle border border-2 border-primary shadow-sm" style="width: 76px; height: 76px; object-fit: cover;">
+                <div>
+                    <h4 class="fw-bold mb-1 text-dark">{{ patient.display_name or patient.name }}</h4>
+                    <div class="text-muted small">
+                        <span><i class="fas fa-calendar-day me-1 text-primary"></i> {{ patient.formatted_dob }}</span> &bull; 
+                        <span>Age: <strong>{{ patient.age }} yrs</strong></span> &bull; 
+                        <span>{{ patient.gender }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Critical Emergency Indicators -->
+            <div class="row g-2 mb-3">
+                <div class="col-6">
+                    <div class="info-pill h-100 bg-danger bg-opacity-10 border-danger border-opacity-25">
+                        <div class="info-label text-danger"><i class="fas fa-droplet me-1"></i> Blood Group</div>
+                        <div class="info-value text-danger fs-5">{{ patient.blood_group or 'O+' }}</div>
+                    </div>
+                </div>
+                <div class="col-6">
+                    <div class="info-pill h-100 {% if patient.allergies and patient.allergies.lower() != 'none' %}bg-warning bg-opacity-10 border-warning border-opacity-25{% else %}bg-success bg-opacity-10 border-success border-opacity-25{% endif %}">
+                        <div class="info-label {% if patient.allergies and patient.allergies.lower() != 'none' %}text-warning text-dark{% else %}text-success{% endif %}">
+                            <i class="fas fa-shield-virus me-1"></i> Allergies
+                        </div>
+                        <div class="info-value {% if patient.allergies and patient.allergies.lower() != 'none' %}text-dark{% else %}text-success{% endif %} small">
+                            {{ patient.allergies or 'None reported' }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Contact & Location Info -->
+            <div class="info-pill mb-3">
+                <div class="row g-2">
+                    <div class="col-6">
+                        <div class="info-label"><i class="fas fa-phone me-1"></i> Emergency Phone</div>
+                        <div class="info-value">{{ patient.phone or 'Not provided' }}</div>
+                    </div>
+                    <div class="col-6">
+                        <div class="info-label"><i class="fas fa-location-dot me-1"></i> Registered Location</div>
+                        <div class="info-value small">{{ patient.location_display or 'India' }}</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Privacy Notice -->
+            <div class="p-2 mb-4 rounded-3 bg-light border text-center small text-muted">
+                <i class="fas fa-lock me-1 text-primary"></i> Detailed longitudinal clinical notes & prescription histories are encrypted and accessible via authenticated clinician portal.
+            </div>
+
+            <!-- Emergency Actions -->
+            <div class="row g-2">
+                <div class="col-6">
+                    <a href="tel:108" class="btn btn-danger w-100 rounded-pill fw-semibold py-2">
+                        <i class="fas fa-truck-medical me-1"></i> Call 108 Ambulance
+                    </a>
+                </div>
+                <div class="col-6">
+                    <a href="tel:{{ patient.phone }}" class="btn btn-primary w-100 rounded-pill fw-semibold py-2">
+                        <i class="fas fa-phone me-1"></i> Call Patient
+                    </a>
+                </div>
+            </div>
+
+            <div class="text-center mt-3">
+                <a href="{{ url_for('login') }}" class="text-decoration-none small text-muted">
+                    <i class="fas fa-right-to-bracket me-1"></i> Health Camp Login
+                </a>
+            </div>
+
+        </div>
+
+    </div>
+
+</body>
+</html>

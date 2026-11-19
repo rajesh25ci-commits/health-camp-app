@@ -2,8 +2,10 @@
 SQLAlchemy Database Models for Smart Community Health Camp Management System.
 Defines entity models for Users, Patients, Doctors, Camps, Appointments,
 Health Records, and Inventory/Medicines, with explicit relationships and helper methods.
+Includes strict role support for Dual-Portal (Patient vs Doctor & Clinical Staff).
 """
 
+import random
 from datetime import datetime, date
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import UserMixin
@@ -13,19 +15,51 @@ from werkzeug.security import generate_password_hash, check_password_hash
 db = SQLAlchemy()
 
 
+def generate_10_digit_patient_id() -> str:
+    """
+    Generate a guaranteed unique 10-digit numeric Patient ID (e.g., 7391048265).
+    Checks against existing Patient records to avoid collisions.
+    """
+    while True:
+        candidate = str(random.randint(1000000000, 9999999999))
+        if not Patient.query.filter_by(patient_uid=candidate).first():
+            return candidate
+
+
 class User(UserMixin, db.Model):
     """
-    User entity representing system operators (Admins, Doctors, Volunteers).
-    Includes Flask-Login UserMixin and secure password hashing via Werkzeug.
+    User entity representing portal operators and registered patients.
+    Supports Dual-Portal authentication:
+    - 'Patient' (personal health pass & data isolation)
+    - 'Doctor', 'Admin', 'Pharmacist', 'Receptionist', 'Emergency Staff'
     """
     __tablename__ = 'users'
 
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False, index=True)
+    email = db.Column(db.String(120), unique=True, nullable=True, index=True)
     full_name = db.Column(db.String(120), nullable=True)
     password_hash = db.Column(db.String(256), nullable=False)
-    role = db.Column(db.String(20), nullable=False, default='Volunteer')  # 'Admin', 'Doctor', 'Volunteer'
+    role = db.Column(db.String(30), nullable=False, default='Patient')  # 'Patient', 'Doctor', 'Admin', 'Pharmacist', 'Receptionist', 'Emergency Staff'
+    phone = db.Column(db.String(20), nullable=True)
+
+    # Email Verification attributes
+    is_email_verified = db.Column(db.Boolean, default=False, nullable=False)
+    verification_otp = db.Column(db.String(10), nullable=True)
+    otp_created_at = db.Column(db.DateTime, nullable=True)
+
+    # Professional Medical Credentials (for Doctor/Clinical Staff)
+    license_number = db.Column(db.String(80), nullable=True)  # NMC / State Medical Council ID
+    specialization = db.Column(db.String(120), nullable=True)  # General Physician, Cardiologist, Pediatrician, etc.
+    qualification = db.Column(db.String(100), nullable=True)   # MBBS, MD, B.Pharm, etc.
+
+    # Patient Association (for Patient role)
+    patient_id = db.Column(db.Integer, db.ForeignKey('patients.id', ondelete='SET NULL'), nullable=True)
+
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    # Relationships
+    patient_record = db.relationship('Patient', backref=db.backref('user_account', uselist=False), foreign_keys=[patient_id])
 
     def set_password(self, password: str) -> None:
         """Hash plain-text password using PBKDF2/scrypt and store hash."""
@@ -35,41 +69,71 @@ class User(UserMixin, db.Model):
         """Verify plain-text password against stored password hash."""
         return check_password_hash(self.password_hash, password)
 
+    def is_patient(self) -> bool:
+        """Check if user is a registered Patient."""
+        return self.role == 'Patient'
+
     def is_admin(self) -> bool:
         """Check if user has Admin privileges."""
         return self.role == 'Admin'
 
     def is_doctor(self) -> bool:
         """Check if user has Doctor privileges."""
-        return self.role == 'Doctor'
+        return self.role in ('Doctor', 'Admin')
+
+    def is_pharmacist(self) -> bool:
+        """Check if user has Pharmacist privileges."""
+        return self.role in ('Pharmacist', 'Admin')
+
+    def is_receptionist(self) -> bool:
+        """Check if user has Receptionist privileges."""
+        return self.role in ('Receptionist', 'Admin', 'Coordinator')
+
+    def is_emergency_staff(self) -> bool:
+        """Check if user has Emergency triage/108 privileges."""
+        return self.role in ('Emergency Staff', 'Emergency', 'Doctor', 'Admin')
 
     def is_volunteer(self) -> bool:
         """Check if user has Volunteer privileges."""
-        return self.role == 'Volunteer'
+        return self.role in ('Volunteer', 'Receptionist', 'Admin')
 
     def __repr__(self) -> str:
-        return f"<User id={self.id} username='{self.username}' role='{self.role}'>"
+        return f"<User id={self.id} username='{self.username}' role='{self.role}' email='{self.email}'>"
 
 
 class Patient(db.Model):
     """
-    Patient entity registered at community health camps.
-    Maintains demographics, contact info, photo, and dynamic QR Code identifier.
+    Patient entity registered at community health camps or via self-service Patient Portal.
+    Maintains complete demographic profile, unique 10-digit ID, DOB, location,
+    blood group, known allergies, and scannable Digital Health Pass QR.
     """
     __tablename__ = 'patients'
 
     id = db.Column(db.Integer, primary_key=True)
-    patient_uid = db.Column(db.String(32), unique=True, nullable=False, index=True)  # e.g., 'PAT-2026-0001'
+    patient_uid = db.Column(db.String(32), unique=True, nullable=False, index=True)  # Guaranteed 10-digit numeric ID (e.g. '7391048265')
+    first_name = db.Column(db.String(60), nullable=True)
+    last_name = db.Column(db.String(60), nullable=True)
     name = db.Column(db.String(120), nullable=False)
+    dob = db.Column(db.Date, nullable=True)  # Calendar DOB picker
     age = db.Column(db.Integer, nullable=False)
-    gender = db.Column(db.String(10), nullable=False)  # 'Male', 'Female', 'Other'
+    gender = db.Column(db.String(20), nullable=False)  # 'Male', 'Female', 'Other'
+    blood_group = db.Column(db.String(10), nullable=True, default='O+')  # 'A+', 'B+', 'O+', etc.
+    allergies = db.Column(db.Text, nullable=True, default='None')       # 'Penicillin', 'Sulfa', 'None'
     phone = db.Column(db.String(20), nullable=True)
+    email = db.Column(db.String(120), nullable=True)
+
+    # Cascading Location
+    country = db.Column(db.String(80), nullable=True, default='India')
+    state = db.Column(db.String(100), nullable=True)
+    city = db.Column(db.String(100), nullable=True)
     address = db.Column(db.Text, nullable=True)
+
     photo_filename = db.Column(db.String(255), nullable=True)
-    qr_code_path = db.Column(db.String(255), nullable=True)  # relative path, e.g., 'qrcodes/PAT-2026-0001.png'
+    qr_code_path = db.Column(db.String(255), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
-    symptoms = db.Column(db.Text, nullable=True)  # Chief complaints ('Kya Hua Hai?')
+    symptoms = db.Column(db.Text, nullable=True)
     urgency_level = db.Column(db.String(20), default='NORMAL', nullable=False)  # 'NORMAL', 'URGENT', 'EMERGENCY'
+    temperature = db.Column(db.Float, default=98.6, nullable=True)
 
     # Relationships
     appointments = db.relationship('Appointment', backref='patient', lazy=True, cascade='all, delete-orphan')
@@ -77,18 +141,45 @@ class Patient(db.Model):
 
     @property
     def patient_id(self) -> str:
-        """Alias for patient_uid to guarantee backwards compatibility and prevent AttributeError."""
+        """Alias for patient_uid to guarantee backwards compatibility."""
         return self.patient_uid
+
+    @property
+    def display_name(self) -> str:
+        if self.first_name and self.last_name:
+            return f"{self.first_name} {self.last_name}"
+        return self.name or "Beneficiary"
+
+    @property
+    def formatted_dob(self) -> str:
+        if self.dob:
+            return self.dob.strftime('%Y-%m-%d')
+        return "N/A"
+
+    @property
+    def location_display(self) -> str:
+        parts = [p for p in [self.city, self.state, self.country] if p]
+        return ", ".join(parts) if parts else (self.address or "India")
 
     def to_dict(self) -> dict:
         """Serialize patient details for API / view consumption."""
         return {
             'id': self.id,
             'patient_uid': self.patient_uid,
+            'first_name': self.first_name,
+            'last_name': self.last_name,
             'name': self.name,
+            'dob': self.formatted_dob,
             'age': self.age,
             'gender': self.gender,
+            'blood_group': self.blood_group,
+            'allergies': self.allergies,
             'phone': self.phone,
+            'email': self.email,
+            'country': self.country,
+            'state': self.state,
+            'city': self.city,
+            'location': self.location_display,
             'address': self.address,
             'photo_filename': self.photo_filename,
             'qr_code_path': self.qr_code_path,
@@ -109,11 +200,14 @@ class Doctor(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(120), nullable=False)
-    specialization = db.Column(db.String(100), nullable=False)  # e.g., General Medicine, Pediatrics, Cardiology
+    license_number = db.Column(db.String(80), nullable=True)
+    specialization = db.Column(db.String(100), nullable=False)  # General Medicine, Pediatrics, Cardiology, etc.
+    qualification = db.Column(db.String(100), nullable=True)   # MBBS, MD, etc.
     phone = db.Column(db.String(20), nullable=True)
     email = db.Column(db.String(120), nullable=True)
     photo_filename = db.Column(db.String(255), nullable=True)
-    availability = db.Column(db.String(100), default='Available', nullable=False)  # e.g., 'Available', 'On Leave', 'Busy'
+    availability = db.Column(db.String(100), default='Available', nullable=False)
+    user_id = db.Column(db.Integer, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
 
     # Relationships
@@ -124,7 +218,9 @@ class Doctor(db.Model):
         return {
             'id': self.id,
             'name': self.name,
+            'license_number': self.license_number,
             'specialization': self.specialization,
+            'qualification': self.qualification,
             'phone': self.phone,
             'email': self.email,
             'photo_filename': self.photo_filename,
@@ -149,7 +245,7 @@ class Camp(db.Model):
     longitude = db.Column(db.Float, nullable=True)
     date = db.Column(db.Date, nullable=False, default=date.today)
     target_beneficiaries = db.Column(db.Integer, default=100, nullable=False)
-    status = db.Column(db.String(20), default='Upcoming', nullable=False)  # 'Upcoming', 'Ongoing', 'Completed'
+    status = db.Column(db.String(20), default='Upcoming', nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
 
     # Relationships
@@ -185,12 +281,14 @@ class Appointment(db.Model):
     date = db.Column(db.Date, nullable=False, default=date.today)
     time = db.Column(db.String(20), nullable=False)  # e.g., '10:00 AM'
     status = db.Column(db.String(20), default='Scheduled', nullable=False)  # 'Scheduled', 'In-Progress', 'Completed', 'Cancelled'
+    slot_number = db.Column(db.Integer, default=1, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     systolic_bp = db.Column(db.Integer, nullable=True)
     diastolic_bp = db.Column(db.Integer, nullable=True)
     blood_sugar = db.Column(db.Float, nullable=True)
     spo2 = db.Column(db.Float, nullable=True)
     pulse_rate = db.Column(db.Integer, nullable=True)
+    temperature = db.Column(db.Float, default=98.6, nullable=True)
     is_critical = db.Column(db.Boolean, default=False, nullable=True)
     triage_priority = db.Column(db.String(20), default='NORMAL_GREEN', nullable=True)
 
@@ -205,7 +303,8 @@ class Appointment(db.Model):
             'camp_title': self.camp.title if self.camp else None,
             'date': self.date.strftime('%Y-%m-%d') if self.date else None,
             'time': self.time,
-            'status': self.status
+            'status': self.status,
+            'slot_number': self.slot_number
         }
 
     def __repr__(self) -> str:
@@ -215,7 +314,7 @@ class Appointment(db.Model):
 class HealthRecord(db.Model):
     """
     HealthRecord entity encapsulating medical observations, diagnosis,
-    prescription, and doctor notes from a specific camp consultation.
+    prescription, AI risk assessment, and doctor notes from a consultation.
     """
     __tablename__ = 'health_records'
 
@@ -227,13 +326,25 @@ class HealthRecord(db.Model):
     prescription = db.Column(db.Text, nullable=True)
     doctor_notes = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    # Vitals
     systolic_bp = db.Column(db.Integer, nullable=True)
     diastolic_bp = db.Column(db.Integer, nullable=True)
     blood_sugar = db.Column(db.Float, nullable=True)
     spo2 = db.Column(db.Float, nullable=True)
     pulse_rate = db.Column(db.Integer, nullable=True)
+    temperature = db.Column(db.Float, default=98.6, nullable=True)
     is_critical = db.Column(db.Boolean, default=False, nullable=True)
     triage_priority = db.Column(db.String(20), default='NORMAL_GREEN', nullable=True)
+
+    # AI Health Risk Assessment
+    risk_level = db.Column(db.String(20), default='LOW RISK', nullable=True)  # 'LOW RISK', 'MEDIUM RISK', 'HIGH RISK'
+    risk_reason = db.Column(db.Text, nullable=True)
+
+    # Post-Camp Patient Follow-up Tracker
+    followup_date = db.Column(db.Date, nullable=True)
+    followup_status = db.Column(db.String(30), default='None', nullable=True)  # 'None', 'Scheduled', 'Reminded', 'Completed'
+    followup_notes = db.Column(db.Text, nullable=True)
 
     def to_dict(self) -> dict:
         return {
@@ -244,6 +355,10 @@ class HealthRecord(db.Model):
             'diagnosis': self.diagnosis,
             'prescription': self.prescription,
             'doctor_notes': self.doctor_notes,
+            'risk_level': self.risk_level,
+            'risk_reason': self.risk_reason,
+            'followup_date': self.followup_date.strftime('%Y-%m-%d') if self.followup_date else None,
+            'followup_status': self.followup_status,
             'created_at': self.created_at.strftime('%Y-%m-%d %H:%M:%S')
         }
 
@@ -269,13 +384,17 @@ class Medicine(db.Model):
 
     @property
     def is_low_stock(self) -> bool:
-        """Determines if the available stock has breached the reorder threshold."""
         return self.quantity <= self.reorder_level
 
     @property
     def is_expired(self) -> bool:
-        """Determines if the medicine batch has expired based on current date."""
         return self.expiry_date < date.today()
+
+    @property
+    def is_expiring_soon(self) -> bool:
+        if self.is_expired:
+            return False
+        return (self.expiry_date - date.today()).days <= 60
 
     def to_dict(self) -> dict:
         return {
@@ -287,7 +406,8 @@ class Medicine(db.Model):
             'unit_price': self.unit_price,
             'reorder_level': self.reorder_level,
             'is_low_stock': self.is_low_stock,
-            'is_expired': self.is_expired
+            'is_expired': self.is_expired,
+            'is_expiring_soon': self.is_expiring_soon
         }
 
     def __repr__(self) -> str:

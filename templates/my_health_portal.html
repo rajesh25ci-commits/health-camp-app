@@ -1,0 +1,396 @@
+{% extends "base.html" %}
+
+{% block title %}My Digital Health Portal{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-3 px-3 px-lg-4">
+
+    <!-- ======================================================== -->
+    <!-- TOP BENEFICIARY IDENTITY & 10-DIGIT PASS HERO BANNER -->
+    <!-- ======================================================== -->
+    <div class="card border-0 rounded-4 shadow-sm mb-4 overflow-hidden text-white" style="background: linear-gradient(135deg, #0a192f 0%, #0f3460 50%, #164e63 100%);">
+        <div class="card-body p-4 p-lg-5 position-relative">
+            <div class="row align-items-center g-4">
+                
+                <!-- Patient Avatar -->
+                <div class="col-auto">
+                    <div class="position-relative">
+                        <img src="{{ photo_url }}" alt="{{ patient.name }}" class="rounded-circle border border-3 border-info shadow" style="width: 100px; height: 100px; object-fit: cover; background: #ffffff;">
+                        <span class="position-absolute bottom-0 end-0 bg-success p-2 rounded-circle border border-2 border-white" title="Verified Beneficiary"></span>
+                    </div>
+                </div>
+
+                <!-- Patient Identity & Badges -->
+                <div class="col">
+                    <div class="d-flex align-items-center flex-wrap gap-2 mb-2">
+                        <span class="badge bg-info text-dark px-3 py-1 rounded-pill fw-bold" style="font-size: 0.85rem; letter-spacing: 0.5px;">
+                            <i class="fas fa-id-card me-1"></i> PATIENT ID: <span id="patIdText">{{ patient.patient_uid }}</span>
+                        </span>
+                        <button type="button" class="btn btn-sm btn-outline-light py-0 px-2 rounded-pill" onclick="copyPatientId()" style="font-size: 0.72rem;">
+                            <i class="fas fa-copy me-1"></i> Copy
+                        </button>
+                        <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1 rounded-pill" style="font-size: 0.75rem;">
+                            <i class="fas fa-shield-check me-1"></i> Verified Smart Pass
+                        </span>
+                    </div>
+
+                    <h2 class="fw-bold mb-1 brand-font text-white">{{ patient.display_name or patient.name }}</h2>
+                    
+                    <div class="d-flex align-items-center flex-wrap gap-3 text-white-50 small mt-2">
+                        <span><i class="fas fa-cake-candles me-1 text-info"></i> {{ patient.formatted_dob }} (Age: {{ patient.age }} yrs)</span>
+                        <span><i class="fas fa-venus-mars me-1 text-info"></i> {{ patient.gender }}</span>
+                        <span><i class="fas fa-droplet me-1 text-danger"></i> Blood Group: <strong class="text-white">{{ patient.blood_group or 'O+' }}</strong></span>
+                        <span><i class="fas fa-location-dot me-1 text-info"></i> {{ patient.location_display or 'India' }}</span>
+                        <span><i class="fas fa-phone me-1 text-info"></i> {{ patient.phone }}</span>
+                    </div>
+
+                    <!-- Allergies Banner -->
+                    <div class="mt-3">
+                        {% if patient.allergies and patient.allergies.lower() != 'none' %}
+                            <span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-50 px-3 py-1 rounded-pill">
+                                <i class="fas fa-triangle-exclamation me-1"></i> Allergies: {{ patient.allergies }}
+                            </span>
+                        {% else %}
+                            <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-50 px-3 py-1 rounded-pill">
+                                <i class="fas fa-circle-check me-1"></i> No Known Allergies
+                            </span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Quick Action Buttons -->
+                <div class="col-12 col-md-auto text-md-end">
+                    <div class="d-flex flex-column flex-sm-row flex-md-column gap-2">
+                        <a href="{{ url_for('patient_pdf', patient_id=patient.patient_uid) }}" class="btn btn-info text-dark fw-bold rounded-pill px-4 shadow-sm d-flex align-items-center justify-content-center gap-2">
+                            <i class="fas fa-file-pdf"></i>
+                            <span>Download Official PDF Card</span>
+                        </a>
+                        <a href="{{ whatsapp_url }}" target="_blank" class="btn btn-outline-success fw-semibold rounded-pill px-4 d-flex align-items-center justify-content-center gap-2">
+                            <i class="fab fa-whatsapp"></i>
+                            <span>WhatsApp Schedule</span>
+                        </a>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- ======================================================== -->
+    <!-- EMERGENCY 108 AMBULANCE BANNER (IF TRIGGERED) -->
+    <!-- ======================================================== -->
+    {% if ambulance_log or (latest_record and latest_record.triage_level == 'EMERGENCY') %}
+    <div class="alert alert-danger border-danger border-2 rounded-4 shadow-sm mb-4 d-flex align-items-center justify-content-between p-3" role="alert">
+        <div class="d-flex align-items-center gap-3">
+            <div class="bg-danger text-white rounded-circle p-3 d-flex align-items-center justify-content-center" style="width: 48px; height: 48px;">
+                <i class="fas fa-truck-medical fs-4"></i>
+            </div>
+            <div>
+                <h6 class="fw-bold mb-0 text-danger">EMERGENCY 108 AMBULANCE ALERT DISPATCHED</h6>
+                <p class="mb-0 small text-danger">Critical vitals detected. Patient referral logged to tertiary care hospital.</p>
+            </div>
+        </div>
+        <a href="tel:108" class="btn btn-danger btn-sm rounded-pill px-3 fw-bold">
+            <i class="fas fa-phone-volume me-1"></i> Call 108
+        </a>
+    </div>
+    {% endif %}
+
+    <!-- ======================================================== -->
+    <!-- MAIN GRID: LEFT (QR PASS & WELLNESS) | RIGHT (CLINICAL & AI) -->
+    <!-- ======================================================== -->
+    <div class="row g-4">
+
+        <!-- LEFT COLUMN: DIGITAL QR HEALTH PASS & WELLNESS -->
+        <div class="col-12 col-xl-4">
+            
+            <!-- 10-Digit Smartphone-Scannable QR Pass -->
+            <div class="card border-0 rounded-4 shadow-sm mb-4 text-center overflow-hidden">
+                <div class="card-header bg-white py-3 border-bottom">
+                    <span class="badge bg-primary-subtle text-primary fw-semibold px-2 py-1 rounded-pill mb-1">SMARTPHONE CAMERA SCANNABLE</span>
+                    <h5 class="fw-bold mb-0 text-dark">Digital QR Health Pass</h5>
+                </div>
+                <div class="card-body p-4">
+                    <div class="d-inline-block p-3 rounded-4 bg-white border border-2 shadow-sm mb-3">
+                        <img src="{{ url_for('static', filename='qrcodes/patient_' ~ patient.patient_uid ~ '.png') }}" alt="QR Health Pass" class="img-fluid" style="width: 220px; height: 220px;">
+                    </div>
+                    <div class="font-monospace text-primary fw-bold fs-5 mb-1">{{ patient.patient_uid }}</div>
+                    <p class="text-muted small mb-3">
+                        Scan directly with any smartphone camera to open the instant emergency verification card.
+                    </p>
+                    <div class="d-grid gap-2">
+                        <a href="{{ url_for('verify_pass', patient_uid=patient.patient_uid) }}" target="_blank" class="btn btn-outline-primary btn-sm rounded-pill">
+                            <i class="fas fa-arrow-up-right-from-square me-1"></i> Preview Public Emergency Pass
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Health Wellness Score Gauge -->
+            <div class="card border-0 rounded-4 shadow-sm mb-4">
+                <div class="card-header bg-white py-3 border-bottom d-flex align-items-center justify-content-between">
+                    <h6 class="fw-bold mb-0 text-dark"><i class="fas fa-heart text-danger me-2"></i>Wellness Index</h6>
+                    <span class="badge bg-info-subtle text-info rounded-pill">{{ wellness.status }}</span>
+                </div>
+                <div class="card-body p-4 text-center">
+                    <div class="display-4 fw-bold text-primary mb-1">{{ wellness.score }}<span class="fs-6 text-muted">/100</span></div>
+                    <div class="progress mb-3" style="height: 10px; border-radius: 10px;">
+                        <div class="progress-bar {% if wellness.score >= 80 %}bg-success{% elif wellness.score >= 60 %}bg-info{% elif wellness.score >= 40 %}bg-warning{% else %}bg-danger{% endif %}" role="progressbar" style="width: {{ wellness.score }}%;"></div>
+                    </div>
+                    <p class="text-muted small mb-0">{{ wellness.feedback }}</p>
+                </div>
+            </div>
+
+            <!-- 4-Step Patient Journey Tracker -->
+            <div class="card border-0 rounded-4 shadow-sm mb-4">
+                <div class="card-header bg-white py-3 border-bottom">
+                    <h6 class="fw-bold mb-0 text-dark"><i class="fas fa-route text-primary me-2"></i>Camp Journey Tracker</h6>
+                </div>
+                <div class="card-body p-3">
+                    <ul class="list-group list-group-flush small">
+                        {% for step in journey_steps %}
+                        <li class="list-group-item d-flex align-items-center justify-content-between px-0 py-2 border-0">
+                            <div class="d-flex align-items-center gap-2">
+                                <i class="fas {% if step.done %}fa-circle-check text-success{% else %}fa-circle text-muted text-opacity-50{% endif %} fs-6"></i>
+                                <span class="{% if step.done %}fw-semibold text-dark{% else %}text-muted{% endif %}">{{ step.title }}</span>
+                            </div>
+                            <span class="badge {% if step.done %}bg-success-subtle text-success{% else %}bg-secondary-subtle text-muted{% endif %} rounded-pill" style="font-size: 0.7rem;">
+                                {{ step.status }}
+                            </span>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- RIGHT COLUMN: CLINICAL VITALS, MEDICINES, DIET & AI ASSISTANT -->
+        <div class="col-12 col-xl-8">
+
+            <!-- Latest Vitals & Triage Status Card -->
+            <div class="card border-0 rounded-4 shadow-sm mb-4">
+                <div class="card-header bg-white py-3 border-bottom d-flex align-items-center justify-content-between">
+                    <h6 class="fw-bold mb-0 text-dark"><i class="fas fa-wave-square text-info me-2"></i>Latest Vitals & Clinical Triage</h6>
+                    {% if latest_record %}
+                        <span class="text-muted small">{{ latest_record.created_at.strftime('%d %b %Y, %I:%M %p') }}</span>
+                    {% else %}
+                        <span class="badge bg-secondary-subtle text-muted rounded-pill">Awaiting Checkup</span>
+                    {% endif %}
+                </div>
+                <div class="card-body p-4">
+                    {% if latest_record and latest_record.systolic_bp %}
+                    <div class="row row-cols-2 row-cols-md-4 g-3 text-center mb-3">
+                        <div class="col">
+                            <div class="p-3 rounded-3 bg-light border">
+                                <span class="text-muted small d-block mb-1">Blood Pressure</span>
+                                <span class="fw-bold fs-5 text-dark">{{ latest_record.systolic_bp }}/{{ latest_record.diastolic_bp }}</span>
+                                <span class="text-muted d-block small">mmHg</span>
+                            </div>
+                        </div>
+                        <div class="col">
+                            <div class="p-3 rounded-3 bg-light border">
+                                <span class="text-muted small d-block mb-1">Blood Sugar</span>
+                                <span class="fw-bold fs-5 text-dark">{{ latest_record.blood_sugar or 'N/A' }}</span>
+                                <span class="text-muted d-block small">mg/dL</span>
+                            </div>
+                        </div>
+                        <div class="col">
+                            <div class="p-3 rounded-3 bg-light border">
+                                <span class="text-muted small d-block mb-1">SpO2 Oxygen</span>
+                                <span class="fw-bold fs-5 text-dark">{{ latest_record.spo2 or '98' }}%</span>
+                                <span class="text-muted d-block small">Normal: 95-100%</span>
+                            </div>
+                        </div>
+                        <div class="col">
+                            <div class="p-3 rounded-3 bg-light border">
+                                <span class="text-muted small d-block mb-1">Pulse Rate</span>
+                                <span class="fw-bold fs-5 text-dark">{{ latest_record.pulse_rate or '76' }}</span>
+                                <span class="text-muted d-block small">BPM</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {% if latest_record.diagnosis %}
+                    <div class="p-3 rounded-3 bg-light border mb-2">
+                        <div class="fw-semibold text-dark mb-1"><i class="fas fa-stethoscope me-1 text-primary"></i> Doctor Diagnosis:</div>
+                        <div class="text-muted small">{{ latest_record.diagnosis }}</div>
+                    </div>
+                    {% endif %}
+
+                    {% else %}
+                    <div class="text-center py-4 text-muted">
+                        <i class="fas fa-notes-medical fs-1 mb-2 text-info opacity-50"></i>
+                        <p class="mb-0">No clinical vitals recorded yet. Please visit the triage counter at the health camp.</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Active Tablet Schedule & Timings -->
+            <div class="card border-0 rounded-4 shadow-sm mb-4">
+                <div class="card-header bg-white py-3 border-bottom d-flex align-items-center justify-content-between">
+                    <h6 class="fw-bold mb-0 text-dark"><i class="fas fa-pills text-success me-2"></i>Prescribed Tablet Timings Schedule</h6>
+                    <span class="badge bg-success-subtle text-success rounded-pill">Dose Reminders</span>
+                </div>
+                <div class="card-body p-4">
+                    {% if symptom_schedule and symptom_schedule.medicines %}
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr class="small text-muted">
+                                    <th>Medicine Name</th>
+                                    <th>Morning ☀️</th>
+                                    <th>Afternoon 🌤️</th>
+                                    <th>Night 🌙</th>
+                                    <th>Instructions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for med in symptom_schedule.medicines %}
+                                <tr class="small">
+                                    <td class="fw-semibold text-dark">{{ med.name }}</td>
+                                    <td><span class="badge bg-light text-dark border">{{ med.morning }}</span></td>
+                                    <td><span class="badge bg-light text-dark border">{{ med.afternoon }}</span></td>
+                                    <td><span class="badge bg-light text-dark border">{{ med.night }}</span></td>
+                                    <td class="text-muted">{{ med.instructions }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% elif latest_record and latest_record.prescription %}
+                    <div class="p-3 rounded-3 bg-light border font-monospace small" style="white-space: pre-wrap;">{{ latest_record.prescription }}</div>
+                    {% else %}
+                    <p class="text-muted small mb-0">No active medication prescriptions on record.</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Personalized Indian Diet Plan -->
+            <div class="card border-0 rounded-4 shadow-sm mb-4">
+                <div class="card-header bg-white py-3 border-bottom">
+                    <h6 class="fw-bold mb-0 text-dark"><i class="fas fa-utensils text-warning me-2"></i>Personalized Indian Diet Plan</h6>
+                </div>
+                <div class="card-body p-4">
+                    <div class="row g-3">
+                        <div class="col-12 col-md-6">
+                            <div class="p-3 rounded-3 bg-success bg-opacity-10 border border-success border-opacity-25 h-100">
+                                <h6 class="fw-bold text-success mb-2"><i class="fas fa-circle-check me-1"></i> Recommended Foods:</h6>
+                                <p class="text-muted small mb-0">{{ diet_plan.recommended or 'Fresh green leafy vegetables, whole pulses (dal), millets (jowar, bajra), fruits, warm water, and buttermilk.' }}</p>
+                            </div>
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <div class="p-3 rounded-3 bg-danger bg-opacity-10 border border-danger border-opacity-25 h-100">
+                                <h6 class="fw-bold text-danger mb-2"><i class="fas fa-circle-xmark me-1"></i> Foods to Avoid:</h6>
+                                <p class="text-muted small mb-0">{{ diet_plan.avoid or 'Excess salt, deep-fried snacks, processed sugar, heavy pickles, and oily gravies.' }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Multilingual Personal AI Health Assistant Chatbot -->
+            <div class="card border-0 rounded-4 shadow-sm mb-4 overflow-hidden">
+                <div class="card-header bg-white py-3 border-bottom d-flex align-items-center justify-content-between">
+                    <div>
+                        <h6 class="fw-bold mb-0 text-dark"><i class="fas fa-robot text-primary me-2"></i>Personal AI Health Assistant</h6>
+                        <span class="text-muted" style="font-size: 0.75rem;">Instant clinical guidance in Kannada, Hindi, English & Hinglish</span>
+                    </div>
+                    <span class="badge bg-primary-subtle text-primary rounded-pill">AI Clinician</span>
+                </div>
+                <div class="card-body p-3">
+                    <div id="portalChatWindow" class="p-3 rounded-3 bg-light border mb-3 overflow-auto" style="height: 240px;">
+                        <div class="d-flex align-items-start gap-2 mb-2">
+                            <div class="rounded-circle bg-primary text-white p-2 d-flex align-items-center justify-content-center" style="width: 32px; height: 32px; font-size: 0.8rem;">
+                                <i class="fas fa-robot"></i>
+                            </div>
+                            <div class="p-2 rounded-3 bg-white border small shadow-sm" style="max-width: 85%;">
+                                Hello {{ patient.first_name or patient.name }}! I am your Smart Health Camp AI assistant. You can ask me any health questions, tablet timings, or diet advice in English, Hindi (नमस्ते), or Kannada (ನಮಸ್ಕಾರ).
+                            </div>
+                        </div>
+                    </div>
+
+                    <form id="portalChatForm" onsubmit="sendPortalChatMessage(event)">
+                        <div class="input-group">
+                            <input type="text" id="portalChatInput" class="form-control" placeholder="Ask your health query (e.g. tablet timing, diet for BP)..." required>
+                            <button type="submit" class="btn btn-primary px-3">
+                                <i class="fas fa-paper-plane me-1"></i> Ask
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+<script>
+function copyPatientId() {
+    const text = document.getElementById('patIdText').innerText;
+    navigator.clipboard.writeText(text).then(() => {
+        alert('Patient ID ' + text + ' copied to clipboard!');
+    });
+}
+
+function sendPortalChatMessage(e) {
+    e.preventDefault();
+    const input = document.getElementById('portalChatInput');
+    const msg = input.value.trim();
+    if (!msg) return;
+
+    const chatWin = document.getElementById('portalChatWindow');
+    // Append user message
+    chatWin.innerHTML += `
+        <div class="d-flex align-items-start justify-content-end gap-2 mb-2">
+            <div class="p-2 rounded-3 bg-primary text-white small shadow-sm" style="max-width: 85%;">
+                ${msg}
+            </div>
+            <div class="rounded-circle bg-secondary text-white p-2 d-flex align-items-center justify-content-center" style="width: 32px; height: 32px; font-size: 0.8rem;">
+                <i class="fas fa-user"></i>
+            </div>
+        </div>
+    `;
+    input.value = '';
+    chatWin.scrollTop = chatWin.scrollHeight;
+
+    // Fetch AI response
+    fetch('{{ url_for("features_v3_bp.api_multilingual_chatbot") }}', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: msg, age: {{ patient.age or 30 }} })
+    })
+    .then(r => r.json())
+    .then(data => {
+        const reply = data.reply || data.response || "I am here to help you. For urgent issues, please visit our clinic or call 108.";
+        chatWin.innerHTML += `
+            <div class="d-flex align-items-start gap-2 mb-2">
+                <div class="rounded-circle bg-primary text-white p-2 d-flex align-items-center justify-content-center" style="width: 32px; height: 32px; font-size: 0.8rem;">
+                    <i class="fas fa-robot"></i>
+                </div>
+                <div class="p-2 rounded-3 bg-white border small shadow-sm" style="max-width: 85%;">
+                    ${reply}
+                </div>
+            </div>
+        `;
+        chatWin.scrollTop = chatWin.scrollHeight;
+    })
+    .catch(err => {
+        chatWin.innerHTML += `
+            <div class="d-flex align-items-start gap-2 mb-2">
+                <div class="rounded-circle bg-primary text-white p-2 d-flex align-items-center justify-content-center" style="width: 32px; height: 32px; font-size: 0.8rem;">
+                    <i class="fas fa-robot"></i>
+                </div>
+                <div class="p-2 rounded-3 bg-white border small shadow-sm" style="max-width: 85%;">
+                    Please take your prescribed medicines on time and drink plenty of clean water. For any critical symptoms, alert the camp doctor.
+                </div>
+            </div>
+        `;
+        chatWin.scrollTop = chatWin.scrollHeight;
+    });
+}
+</script>
+{% endblock %}

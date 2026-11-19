@@ -25,7 +25,7 @@
     <nav class="navbar navbar-expand-xl navbar-dark shadow-sm sticky-top" style="background: linear-gradient(135deg, #1e3a8a 0%, #172554 100%);">
         <div class="container-fluid px-4">
             <!-- Brand -->
-            <a class="navbar-brand d-flex align-items-center gap-2 py-2" href="{{ url_for('dashboard') }}">
+            <a class="navbar-brand d-flex align-items-center gap-2 py-2" href="{% if current_user.is_patient() %}{{ url_for('my_health_portal') }}{% else %}{{ url_for('dashboard') }}{% endif %}">
                 <div class="d-inline-flex align-items-center justify-content-center bg-white text-danger rounded-circle" style="width: 36px; height: 36px;">
                     <i class="fa-solid fa-heart-pulse fs-5"></i>
                 </div>
@@ -42,6 +42,36 @@
 
             <!-- Navigation Links -->
             <div class="collapse navbar-collapse" id="navbarMain">
+                {% if current_user.is_patient() %}
+                <!-- Patient Dedicated Navigation -->
+                <ul class="navbar-nav me-auto mb-2 mb-xl-0 ms-xl-3 gap-1">
+                    <li class="nav-item">
+                        <a class="nav-link px-3 py-2 rounded-2 active bg-white bg-opacity-10 fw-semibold text-white" href="{{ url_for('my_health_portal') }}">
+                            <i class="fas fa-qrcode me-2 text-info"></i>My Digital Health Portal
+                        </a>
+                    </li>
+                </ul>
+
+                <ul class="navbar-nav ms-auto align-items-center gap-2">
+                    <li class="nav-item d-flex align-items-center text-light me-1">
+                        <div class="d-flex align-items-center bg-white bg-opacity-10 border border-white border-opacity-20 px-3 py-1 rounded-pill">
+                            <i class="fas fa-id-card fs-5 text-info me-2"></i>
+                            <div class="d-flex flex-column text-start lh-1">
+                                <span class="fw-semibold text-white small">{{ current_user.full_name or current_user.username }}</span>
+                                <span class="badge bg-info-subtle text-info border border-info-subtle mt-1" style="font-size: 0.65rem; width: fit-content;">
+                                    Verified Beneficiary
+                                </span>
+                            </div>
+                        </div>
+                    </li>
+                    <li class="nav-item">
+                        <a class="btn btn-outline-light btn-sm px-3 rounded-pill" href="{{ url_for('logout') }}">
+                            <i class="fas fa-right-from-bracket me-2"></i> Logout
+                        </a>
+                    </li>
+                </ul>
+                {% else %}
+                <!-- Doctor & Staff Navigation -->
                 <ul class="navbar-nav me-auto mb-2 mb-xl-0 ms-xl-3 gap-1">
                     <li class="nav-item">
                         <a class="nav-link px-3 py-2 rounded-2 {% if request.endpoint == 'dashboard' %}active bg-white bg-opacity-10 fw-semibold text-white{% endif %}" href="{{ url_for('dashboard') }}">
@@ -110,6 +140,7 @@
                         </a>
                     </li>
                 </ul>
+                {% endif %}
             </div>
         </div>
     </nav>
