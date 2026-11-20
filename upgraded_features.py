@@ -375,11 +375,19 @@ def build_medicine_schedule_sms(patient, prescription_text: str, save_to_db: boo
     else:
         msg_lines.append("  • No night medicines")
 
+    # Dynamic host_url resolution (never hardcoded 127.0.0.1)
+    from flask import has_request_context, request
+    if has_request_context():
+        host_url = request.host_url.rstrip('/')
+    else:
+        host_url = os.environ.get('BASE_APP_URL', 'https://health-camp-app.onrender.com').rstrip('/')
+
     msg_lines.append("--------------------------------------")
-    msg_lines.append("⚠️ *IMPORTANT TIPS / आवश्यक निर्देश:*")
-    msg_lines.append("• Drink plenty of clean water (खूब पानी पिएं).")
-    msg_lines.append("• Complete full course. In case of emergency, call 108.")
-    msg_lines.append("• View Digital Health Pass: http://127.0.0.1:5000/patient_card/" + patient_uid)
+    msg_lines.append("⚠️ *IMPORTANT INSTRUCTIONS:*")
+    msg_lines.append("• Take prescribed doses on time with clean boiled water.")
+    msg_lines.append("• Complete full course. In emergency, call 108.")
+    msg_lines.append(f"🔗 *View Digital Pass & Report:* {host_url}/verify-pass/{patient_uid}")
+    msg_lines.append("🚨 *Emergency Helpline:* 108")
 
     full_message = "\n".join(msg_lines)
 
@@ -394,11 +402,13 @@ def build_medicine_schedule_sms(patient, prescription_text: str, save_to_db: boo
         phone_intl = ""
 
     encoded_text = urllib.parse.quote(full_message)
-    whatsapp_url = f"https://api.whatsapp.com/send?phone={phone_intl}&text={encoded_text}" if phone_intl else f"https://api.whatsapp.com/send?text={encoded_text}"
+    whatsapp_url = f"https://wa.me/{phone_intl}?text={encoded_text}" if phone_intl else f"https://wa.me/?text={encoded_text}"
+    sms_url = f"sms:{phone_intl}?body={encoded_text}" if phone_intl else f"sms:?body={encoded_text}"
 
     return {
         'message_text': full_message,
         'whatsapp_url': whatsapp_url,
+        'sms_url': sms_url,
         'schedule': schedule,
         'phone': phone_intl
     }

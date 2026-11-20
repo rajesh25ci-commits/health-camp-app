@@ -639,7 +639,7 @@
 
                             <!-- PATIENT REGISTRATION -->
                             <div id="panelPtSignup" style="display: {% if tab == 'signup' %}block{% else %}none{% endif %};">
-                                <form method="POST" action="{{ url_for('patient_signup') }}" id="ptSignupForm" onsubmit="return validatePtSignup()">
+                                <form method="POST" action="{{ url_for('patient_signup') }}" id="ptSignupForm" enctype="multipart/form-data" onsubmit="return validatePtSignup()">
                                     
                                     <!-- Name Row -->
                                     <div class="row g-2">
@@ -720,23 +720,23 @@
                                         </div>
                                     </div>
 
-                                    <!-- Allergies & Phone -->
+                                    <!-- Phone Number & Beneficiary Photo Row (Allergies moved to Consultation) -->
                                     <div class="row g-2">
-                                        <div class="col-12 col-sm-6">
-                                            <div class="glass-input-wrap">
-                                                <label for="ptAllergies">Known Allergies</label>
-                                                <div class="glass-input-group">
-                                                    <span class="input-icon"><i class="fa-solid fa-shield-virus text-warning"></i></span>
-                                                    <input type="text" class="form-control" id="ptAllergies" name="allergies" placeholder="e.g. Penicillin, Peanuts, None">
-                                                </div>
-                                            </div>
-                                        </div>
                                         <div class="col-12 col-sm-6">
                                             <div class="glass-input-wrap">
                                                 <label for="ptPhone">Phone Number <span class="text-danger">*</span></label>
                                                 <div class="glass-input-group">
                                                     <span class="input-icon"><i class="fa-solid fa-phone"></i></span>
                                                     <input type="tel" class="form-control" id="ptPhone" name="phone" placeholder="10-digit mobile" required>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-12 col-sm-6">
+                                            <div class="glass-input-wrap">
+                                                <label for="ptPhoto">Beneficiary Photo <span class="text-muted small">(Optional)</span></label>
+                                                <div class="glass-input-group">
+                                                    <span class="input-icon"><i class="fa-solid fa-camera"></i></span>
+                                                    <input type="file" class="form-control" id="ptPhoto" name="photo" accept="image/*" capture="user">
                                                 </div>
                                             </div>
                                         </div>

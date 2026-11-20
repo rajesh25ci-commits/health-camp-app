@@ -48,7 +48,7 @@
                     <div class="mt-3">
                         {% if patient.allergies and patient.allergies.lower() != 'none' %}
                             <span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-50 px-3 py-1 rounded-pill">
-                                <i class="fas fa-triangle-exclamation me-1"></i> Allergies: {{ patient.allergies }}
+                                <i class="fas fa-triangle-exclamation me-1"></i> Allergies / Existing Conditions: {{ patient.allergies }}
                             </span>
                         {% else %}
                             <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-50 px-3 py-1 rounded-pill">
@@ -67,7 +67,11 @@
                         </a>
                         <a href="{{ whatsapp_url }}" target="_blank" class="btn btn-outline-success fw-semibold rounded-pill px-4 d-flex align-items-center justify-content-center gap-2">
                             <i class="fab fa-whatsapp"></i>
-                            <span>WhatsApp Schedule</span>
+                            <span>WhatsApp Prescription</span>
+                        </a>
+                        <a href="{{ sms_url }}" class="btn btn-outline-light fw-semibold rounded-pill px-4 d-flex align-items-center justify-content-center gap-2">
+                            <i class="fas fa-comment-sms"></i>
+                            <span>SMS Prescription</span>
                         </a>
                     </div>
                 </div>
@@ -79,7 +83,7 @@
     <!-- ======================================================== -->
     <!-- EMERGENCY 108 AMBULANCE BANNER (IF TRIGGERED) -->
     <!-- ======================================================== -->
-    {% if ambulance_log or (latest_record and latest_record.triage_level == 'EMERGENCY') %}
+    {% if ambulance_log or (latest_record and latest_record.triage_priority == 'EMERGENCY_RED') %}
     <div class="alert alert-danger border-danger border-2 rounded-4 shadow-sm mb-4 d-flex align-items-center justify-content-between p-3" role="alert">
         <div class="d-flex align-items-center gap-3">
             <div class="bg-danger text-white rounded-circle p-3 d-flex align-items-center justify-content-center" style="width: 48px; height: 48px;">
@@ -87,7 +91,7 @@
             </div>
             <div>
                 <h6 class="fw-bold mb-0 text-danger">EMERGENCY 108 AMBULANCE ALERT DISPATCHED</h6>
-                <p class="mb-0 small text-danger">Critical vitals detected. Patient referral logged to tertiary care hospital.</p>
+                <p class="mb-0 small text-danger">Critical triage vitals flagged. Patient referral active to tertiary care hospital.</p>
             </div>
         </div>
         <a href="tel:108" class="btn btn-danger btn-sm rounded-pill px-3 fw-bold">
@@ -168,6 +172,330 @@
         <!-- RIGHT COLUMN: CLINICAL VITALS, MEDICINES, DIET & AI ASSISTANT -->
         <div class="col-12 col-xl-8">
 
+            <!-- ======================================================== -->
+            <!-- PROMINENT LATEST CLINICAL UPDATE FROM DOCTOR -->
+            <!-- ======================================================== -->
+            {% if latest_record %}
+            <div class="card border-0 rounded-4 shadow-sm mb-4 overflow-hidden border-top border-4 border-success">
+                <div class="card-header bg-white py-3 border-bottom d-flex align-items-center justify-content-between">
+                    <div>
+                        <h5 class="fw-bold mb-0 text-dark">
+                            <i class="fas fa-stethoscope text-success me-2"></i>Latest Clinical Diagnosis & Prescription
+                        </h5>
+                        <small class="text-muted">Live update from attending camp physician</small>
+                    </div>
+                    <div>
+                        {% if latest_record.is_critical or latest_record.triage_priority == 'URGENT_YELLOW' or latest_record.triage_priority == 'EMERGENCY_RED' %}
+                            <span class="badge bg-danger text-white rounded-pill px-3 py-1"><i class="fas fa-bell me-1"></i> URGENT CASE</span>
+                        {% else %}
+                            <span class="badge bg-success-subtle text-success border border-success-subtle px-3 py-1 rounded-pill"><i class="fas fa-circle-check me-1"></i> NORMAL PRIORITY</span>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="card-body p-4">
+                    <!-- Attending Doctor & Visit Status -->
+                    <div class="p-3 rounded-3 bg-light border mb-3">
+                        <div class="row align-items-center g-2">
+                            <div class="col-12 col-md-7">
+                                <div class="d-flex align-items-center gap-2">
+                                    <div class="rounded-circle bg-primary-subtle text-primary p-2 d-flex align-items-center justify-content-center" style="width: 44px; height: 44px;">
+                                        <i class="fas fa-user-doctor fs-5"></i>
+                                    </div>
+                                    <div>
+                                        <div class="fw-bold fs-6 text-dark">Dr. {{ latest_record.doctor.name if latest_record.doctor else 'Camp Medical Officer' }}</div>
+                                        <small class="text-muted">{{ latest_record.doctor.specialization if latest_record.doctor else 'General Physician' }} &bull; {{ latest_record.camp.title if latest_record.camp else 'Community Health Camp' }}</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-12 col-md-5 text-md-end">
+                                <div class="text-muted small"><i class="fas fa-calendar-day me-1"></i> {{ latest_record.created_at.strftime('%d %b %Y, %I:%M %p') }}</div>
+                                {% if latest_consultation and latest_consultation.consultation_preference %}
+                                    <span class="badge bg-info-subtle text-info border border-info-subtle rounded-pill mt-1">
+                                        {{ latest_consultation.consultation_preference }}
+                                    </span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 1. Primary Diagnosis -->
+                    <div class="p-3 rounded-3 bg-white border mb-3">
+                        <span class="text-muted small fw-bold d-block mb-1 text-uppercase">Primary Diagnosis:</span>
+                        <div class="fw-bold fs-5 text-primary">{{ latest_record.diagnosis }}</div>
+                    </div>
+
+                    <!-- 2. Prescription & Medication Dosage -->
+                    <div class="p-3 rounded-3 bg-white border mb-3">
+                        <span class="text-muted small fw-bold d-block mb-1 text-uppercase"><i class="fas fa-pills text-success me-1"></i> Prescription & Medication Dosage:</span>
+                        <div class="font-monospace text-dark p-2 bg-light rounded border" style="white-space: pre-wrap; font-size: 0.95rem;">{{ latest_record.prescription or 'Rest, hydration, and take regular meals.' }}</div>
+                    </div>
+
+                    <!-- 3. Doctor Clinical Notes / Dietary Advice -->
+                    <div class="p-3 rounded-3 bg-success bg-opacity-10 border border-success border-opacity-25 mb-3">
+                        <span class="text-success small fw-bold d-block mb-1 text-uppercase"><i class="fas fa-utensils me-1"></i> Doctor Clinical Notes / Dietary Advice:</span>
+                        <div class="text-dark small" style="white-space: pre-wrap;">{{ latest_record.doctor_notes or 'Drink boiled water, maintain a light nutritious diet, avoid cold drinks, and complete full course.' }}</div>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="d-flex flex-wrap gap-2 pt-2 border-top">
+                        <a href="{{ whatsapp_url }}" target="_blank" class="btn btn-success btn-sm rounded-pill px-3">
+                            <i class="fab fa-whatsapp me-1"></i> Share Prescription to WhatsApp
+                        </a>
+                        <a href="{{ sms_url }}" class="btn btn-outline-secondary btn-sm rounded-pill px-3">
+                            <i class="fas fa-comment-sms me-1"></i> SMS Prescription
+                        </a>
+                        <a href="{{ url_for('patient_pdf', patient_id=patient.patient_uid) }}" class="btn btn-outline-danger btn-sm rounded-pill px-3">
+                            <i class="fas fa-file-pdf me-1"></i> Download PDF Card
+                        </a>
+                        <a href="{{ url_for('verify_pass', patient_uid=patient.patient_uid) }}" target="_blank" class="btn btn-outline-primary btn-sm rounded-pill px-3">
+                            <i class="fas fa-shield-check me-1"></i> View Digital Pass
+                        </a>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- ======================================================== -->
+            <!-- 1. SEND HEALTH REPORT & REQUEST DOCTOR TELE-ADVICE CARD -->
+            <!-- ======================================================== -->
+            <div class="card border-0 rounded-4 shadow-sm mb-4 overflow-hidden border-top border-4 border-primary">
+                <div class="card-header bg-white py-3 border-bottom d-flex align-items-center justify-content-between">
+                    <div>
+                        <h5 class="fw-bold mb-0 text-dark">
+                            <i class="fas fa-paper-plane text-primary me-2"></i>Send Health Report / Request Doctor Advice
+                        </h5>
+                        <small class="text-muted">Report symptoms remotely for online tele-advice or request physical camp evaluation</small>
+                    </div>
+                    <span class="badge bg-primary text-white rounded-pill px-3 py-1">Direct Tele-Triage</span>
+                </div>
+                <div class="card-body p-4">
+                    <form method="POST" action="{{ url_for('patient_submit_symptoms') }}">
+                        <!-- Symptoms Description -->
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold text-dark">
+                                Current Symptoms & Problem Description <span class="text-danger">*</span>
+                            </label>
+                            <textarea name="symptoms" class="form-control" rows="3" placeholder="Describe what you are experiencing (e.g. fever with chills since 2 days, persistent headache, dry cough, body aches, eye irritation)..." required></textarea>
+                            <small class="text-muted">Provide details on what you feel so the camp physician can accurately assess your triage severity.</small>
+                        </div>
+
+                        <div class="row g-3 mb-3">
+                            <!-- Known Allergies / Conditions -->
+                            <div class="col-12 col-md-6">
+                                <label class="form-label fw-semibold text-dark">
+                                    <i class="fas fa-shield-virus text-warning me-1"></i> Known Allergies / Existing Conditions
+                                </label>
+                                <input type="text" name="allergies" class="form-control" value="{% if patient.allergies and patient.allergies.lower() != 'none' %}{{ patient.allergies }}{% endif %}" placeholder="e.g. Penicillin, Sulfa, Asthmatic, Diabetic (or None)">
+                                <small class="text-muted">Moved here from registration for clinical prescription safety.</small>
+                            </div>
+
+                            <!-- Symptom Duration -->
+                            <div class="col-12 col-md-6">
+                                <label class="form-label fw-semibold text-dark">
+                                    <i class="fas fa-stopwatch text-info me-1"></i> Symptom Duration
+                                </label>
+                                <select name="duration" class="form-select">
+                                    <option value="1 - 2 Days" selected>1 - 2 Days (Acute / Just started)</option>
+                                    <option value="3 - 5 Days">3 - 5 Days</option>
+                                    <option value="1 Week">1 Week</option>
+                                    <option value="More than 2 Weeks">More than 2 Weeks</option>
+                                    <option value="Chronic / Recurring">Chronic / Recurring condition</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Consultation Preference Toggle -->
+                        <div class="mb-4 p-3 rounded-3 bg-light border">
+                            <label class="form-label fw-bold text-dark d-block mb-2">
+                                <i class="fas fa-sliders text-primary me-1"></i> Consultation & Visit Preference:
+                            </label>
+                            <div class="row g-2">
+                                <div class="col-12 col-md-6">
+                                    <div class="form-check p-3 rounded-3 bg-white border h-100 shadow-sm">
+                                        <input class="form-check-input ms-0 me-2" type="radio" name="consultation_preference" id="prefOnline" value="Sirf Advice Chahiye (Online Advice Only)" checked>
+                                        <label class="form-check-label fw-semibold text-dark cursor-pointer" for="prefOnline">
+                                            <i class="fas fa-laptop-medical text-info me-1"></i> Sirf Advice Chahiye (Online Advice Only)
+                                            <small class="d-block text-muted fw-normal mt-1">Receive digital doctor tele-advice & tablet timings directly on this portal (No camp visit needed).</small>
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="col-12 col-md-6">
+                                    <div class="form-check p-3 rounded-3 bg-white border h-100 shadow-sm">
+                                        <input class="form-check-input ms-0 me-2" type="radio" name="consultation_preference" id="prefCamp" value="Camp Ko Aana Hai (Physical Camp Visit)">
+                                        <label class="form-check-label fw-semibold text-dark cursor-pointer" for="prefCamp">
+                                            <i class="fas fa-tent text-primary me-1"></i> Camp Ko Aana Hai (Physical Camp Visit)
+                                            <small class="d-block text-muted fw-normal mt-1">In-person clinical examination, vital tests & free medicine dispensary at the camp.</small>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary rounded-pill px-4 py-2 fw-bold shadow-sm d-flex align-items-center gap-2">
+                            <i class="fas fa-paper-plane"></i>
+                            <span>Submit Health Report & Request Doctor Advice</span>
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- ======================================================== -->
+            <!-- 2. LIVE CLINICAL ADVICE & PRESCRIPTIONS SECTION -->
+            <!-- ======================================================== -->
+            <div class="card border-0 rounded-4 shadow-sm mb-4 overflow-hidden border-top border-4 border-success">
+                <div class="card-header bg-white py-3 border-bottom d-flex align-items-center justify-content-between">
+                    <div>
+                        <h5 class="fw-bold mb-0 text-dark">
+                            <i class="fas fa-stethoscope text-success me-2"></i>My Clinical Advice & Prescriptions
+                        </h5>
+                        <small class="text-muted">Live real-time sync with attending camp doctors & official prescription records</small>
+                    </div>
+                    {% if latest_consultation and latest_consultation.is_reviewed %}
+                        <span class="badge bg-success text-white rounded-pill px-3 py-1"><i class="fas fa-circle-check me-1"></i> Doctor Reviewed</span>
+                    {% elif latest_consultation %}
+                        <span class="badge bg-warning text-dark rounded-pill px-3 py-1"><i class="fas fa-hourglass-half me-1"></i> Awaiting Review</span>
+                    {% else %}
+                        <span class="badge bg-secondary-subtle text-muted rounded-pill px-3 py-1">No Consultations Yet</span>
+                    {% endif %}
+                </div>
+                <div class="card-body p-4">
+                    {% if consultation_requests %}
+                        {% for req in consultation_requests %}
+                        <div class="p-3 p-md-4 rounded-4 bg-light border mb-3 position-relative shadow-sm {% if req.is_reviewed %}border-start border-success border-4{% else %}border-start border-warning border-4{% endif %}">
+                            <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3 pb-2 border-bottom">
+                                <div>
+                                    <span class="badge {% if req.is_reviewed %}bg-success{% else %}bg-warning text-dark{% endif %} rounded-pill px-3 py-1">
+                                        <i class="fas {% if req.is_reviewed %}fa-circle-check{% else %}fa-hourglass-half{% endif %} me-1"></i> {{ req.status }}
+                                    </span>
+                                    <span class="badge bg-info-subtle text-info border border-info-subtle rounded-pill ms-1">
+                                        <i class="fas {% if 'Online' in req.consultation_preference %}fa-laptop-medical{% else %}fa-tent{% endif %} me-1"></i> {{ req.consultation_preference }}
+                                    </span>
+                                </div>
+                                <div class="text-muted small">
+                                    <i class="fas fa-clock me-1"></i> Submitted: {{ req.formatted_created_at }}
+                                </div>
+                            </div>
+
+                            <!-- Patient's Submitted Symptoms & Info -->
+                            <div class="mb-3">
+                                <span class="text-muted small fw-semibold d-block">Reported Problem / Symptoms:</span>
+                                <div class="fw-semibold text-dark">{{ req.symptoms }}</div>
+                                <small class="text-muted">Duration: {{ req.duration or 'Not specified' }} &bull; Allergies: {{ req.allergies or 'None' }}</small>
+                            </div>
+
+                            {% if req.is_reviewed %}
+                                <!-- Doctor & Camp Venue Info -->
+                                <div class="p-3 rounded-3 bg-white border mb-3">
+                                    <div class="row g-2 align-items-center">
+                                        <div class="col-12 col-md-6">
+                                            <div class="d-flex align-items-center gap-2">
+                                                <div class="rounded-circle bg-primary-subtle text-primary p-2 d-flex align-items-center justify-content-center" style="width: 40px; height: 40px;">
+                                                    <i class="fas fa-user-doctor fs-5"></i>
+                                                </div>
+                                                <div>
+                                                    <div class="fw-bold text-dark">{{ req.doctor.name if req.doctor else 'Camp Medical Officer' }}</div>
+                                                    <small class="text-muted">{{ req.doctor.specialization if req.doctor else 'General Physician' }}</small>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-12 col-md-6 text-md-end">
+                                            <span class="badge bg-danger-subtle text-danger border border-danger-subtle px-2 py-1 rounded-pill">
+                                                <i class="fas fa-location-dot me-1"></i> {{ req.camp.title if req.camp else 'Community Health Camp' }}
+                                            </span>
+                                            <div class="text-muted small mt-1">Reviewed: {{ req.formatted_reviewed_at }}</div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Doctor's Visit Decision Banner -->
+                                {% if req.visit_decision %}
+                                <div class="alert {% if 'camp' in req.visit_decision.lower() %}alert-primary border-primary{% elif 'emergency' in req.visit_decision.lower() %}alert-danger border-danger{% else %}alert-info border-info{% endif %} rounded-3 mb-3 d-flex align-items-center gap-3 py-2 px-3">
+                                    <i class="fas {% if 'camp' in req.visit_decision.lower() %}fa-tent text-primary{% elif 'emergency' in req.visit_decision.lower() %}fa-truck-medical text-danger{% else %}fa-house-chimney-medical text-info{% endif %} fs-4"></i>
+                                    <div>
+                                        <strong class="d-block">Doctor's Visit Decision:</strong>
+                                        <span>{{ req.visit_decision }}</span>
+                                    </div>
+                                </div>
+                                {% endif %}
+
+                                <!-- Doctor Clinical Advice / Diagnosis -->
+                                <div class="p-3 rounded-3 bg-white border mb-3">
+                                    <div class="fw-bold text-primary mb-1">
+                                        <i class="fas fa-clipboard-check me-1"></i> Clinical Advice & Diagnosis:
+                                    </div>
+                                    <p class="mb-0 text-dark small" style="white-space: pre-wrap;">{{ req.clinical_advice }}</p>
+                                </div>
+
+                                <!-- Prescribed Tablets & Timing Schedule (Morning, Afternoon, Night) -->
+                                <div class="mb-3">
+                                    <div class="fw-bold text-dark mb-2">
+                                        <i class="fas fa-pills text-success me-1"></i> Prescribed Tablets & Timing Schedule:
+                                    </div>
+                                    <div class="row g-2">
+                                        <div class="col-12 col-md-4">
+                                            <div class="p-3 rounded-3 bg-warning bg-opacity-10 border border-warning border-opacity-25 h-100">
+                                                <div class="fw-bold text-warning-emphasis mb-1">🌅 Morning (08:00 AM)</div>
+                                                <small class="text-muted d-block mb-1">After Breakfast</small>
+                                                <div class="fw-semibold text-dark small">{{ req.morning_tablets or 'None' }}</div>
+                                            </div>
+                                        </div>
+                                        <div class="col-12 col-md-4">
+                                            <div class="p-3 rounded-3 bg-info bg-opacity-10 border border-info border-opacity-25 h-100">
+                                                <div class="fw-bold text-info-emphasis mb-1">☀️ Afternoon (01:30 PM)</div>
+                                                <small class="text-muted d-block mb-1">After Lunch</small>
+                                                <div class="fw-semibold text-dark small">{{ req.afternoon_tablets or 'None' }}</div>
+                                            </div>
+                                        </div>
+                                        <div class="col-12 col-md-4">
+                                            <div class="p-3 rounded-3 bg-primary bg-opacity-10 border border-primary border-opacity-25 h-100">
+                                                <div class="fw-bold text-primary-emphasis mb-1">🌙 Night (08:30 PM)</div>
+                                                <small class="text-muted d-block mb-1">After Dinner</small>
+                                                <div class="fw-semibold text-dark small">{{ req.night_tablets or 'None' }}</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Doctor's Personalized Food & Diet Recommendations -->
+                                {% if req.diet_recommendations %}
+                                <div class="p-3 rounded-3 bg-success bg-opacity-10 border border-success border-opacity-25 mb-3">
+                                    <div class="fw-bold text-success mb-1">
+                                        <i class="fas fa-bowl-food me-1"></i> Doctor's Personalized Food & Diet Recommendations:
+                                    </div>
+                                    <p class="mb-0 text-dark small" style="white-space: pre-wrap;">{{ req.diet_recommendations }}</p>
+                                </div>
+                                {% endif %}
+
+                                <!-- Direct Action & Prescription Sharing Buttons -->
+                                <div class="d-flex flex-wrap gap-2 pt-2 border-top">
+                                    <a href="{{ whatsapp_url }}" target="_blank" class="btn btn-success btn-sm rounded-pill px-3">
+                                        <i class="fab fa-whatsapp me-1"></i> Share Prescription to WhatsApp
+                                    </a>
+                                    <a href="{{ sms_url }}" class="btn btn-outline-secondary btn-sm rounded-pill px-3">
+                                        <i class="fas fa-comment-sms me-1"></i> SMS Prescription
+                                    </a>
+                                    <a href="{{ url_for('verify_pass', patient_uid=patient.patient_uid) }}" target="_blank" class="btn btn-outline-primary btn-sm rounded-pill px-3">
+                                        <i class="fas fa-shield-check me-1"></i> View Digital Pass
+                                    </a>
+                                </div>
+                            {% else %}
+                                <div class="p-3 rounded-3 bg-white border text-center py-3">
+                                    <i class="fas fa-hourglass-half fa-spin fs-4 text-warning mb-2"></i>
+                                    <p class="mb-1 fw-semibold text-dark">Awaiting Camp Doctor Review</p>
+                                    <p class="text-muted small mb-0">Our camp medical officer is currently evaluating your symptoms. Your personalized tele-advice and tablet dosage will appear here in real time once reviewed.</p>
+                                </div>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="text-center py-4 text-muted">
+                            <i class="fas fa-notes-medical fs-2 text-primary opacity-50 mb-2"></i>
+                            <p class="mb-0">No symptoms reported yet. Use the form above to submit your symptoms and receive personalized doctor advice & tablet schedule!</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
             <!-- Latest Vitals & Triage Status Card -->
             <div class="card border-0 rounded-4 shadow-sm mb-4">
                 <div class="card-header bg-white py-3 border-bottom d-flex align-items-center justify-content-between">
@@ -221,7 +549,7 @@
                     {% else %}
                     <div class="text-center py-4 text-muted">
                         <i class="fas fa-notes-medical fs-1 mb-2 text-info opacity-50"></i>
-                        <p class="mb-0">No clinical vitals recorded yet. Please visit the triage counter at the health camp.</p>
+                        <p class="mb-0">No physical vitals recorded at camp yet. Submit your symptoms above for online tele-advice.</p>
                     </div>
                     {% endif %}
                 </div>
@@ -230,8 +558,8 @@
             <!-- Active Tablet Schedule & Timings -->
             <div class="card border-0 rounded-4 shadow-sm mb-4">
                 <div class="card-header bg-white py-3 border-bottom d-flex align-items-center justify-content-between">
-                    <h6 class="fw-bold mb-0 text-dark"><i class="fas fa-pills text-success me-2"></i>Prescribed Tablet Timings Schedule</h6>
-                    <span class="badge bg-success-subtle text-success rounded-pill">Dose Reminders</span>
+                    <h6 class="fw-bold mb-0 text-dark"><i class="fas fa-pills text-success me-2"></i>Active Medication Reminders</h6>
+                    <span class="badge bg-success-subtle text-success rounded-pill">Dose Timings</span>
                 </div>
                 <div class="card-body p-4">
                     {% if symptom_schedule and symptom_schedule.medicines %}
@@ -297,7 +625,12 @@
                         <h6 class="fw-bold mb-0 text-dark"><i class="fas fa-robot text-primary me-2"></i>Personal AI Health Assistant</h6>
                         <span class="text-muted" style="font-size: 0.75rem;">Instant clinical guidance in Kannada, Hindi, English & Hinglish</span>
                     </div>
-                    <span class="badge bg-primary-subtle text-primary rounded-pill">AI Clinician</span>
+                    <div class="d-flex align-items-center gap-1">
+                        <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2 rounded-pill" onclick="clearPortalChat()" title="Reset / Clear Conversation" style="font-size: 0.72rem;">
+                            <i class="fas fa-rotate-left me-1"></i> Clear
+                        </button>
+                        <span class="badge bg-primary-subtle text-primary rounded-pill">AI Clinician</span>
+                    </div>
                 </div>
                 <div class="card-body p-3">
                     <div id="portalChatWindow" class="p-3 rounded-3 bg-light border mb-3 overflow-auto" style="height: 240px;">
@@ -336,6 +669,32 @@ function copyPatientId() {
     });
 }
 
+function formatMarkdown(text) {
+    if (!text) return '';
+    return text
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.*?)\*/g, '<em>$1</em>')
+        .replace(/\n/g, '<br/>');
+}
+
+function clearPortalChat() {
+    fetch('/api/chatbot/clear', { method: 'POST' })
+        .then(() => {
+            const chatWin = document.getElementById('portalChatWindow');
+            chatWin.innerHTML = `
+                <div class="d-flex align-items-start gap-2 mb-2">
+                    <div class="rounded-circle bg-primary text-white p-2 d-flex align-items-center justify-content-center" style="width: 32px; height: 32px; font-size: 0.8rem;">
+                        <i class="fas fa-robot"></i>
+                    </div>
+                    <div class="p-2 rounded-3 bg-white border small shadow-sm" style="max-width: 85%;">
+                        Conversation reset. Hello {{ patient.first_name or patient.name }}! Ask me anything regarding your symptoms, medications, or diet.
+                    </div>
+                </div>
+            `;
+        })
+        .catch(() => {});
+}
+
 function sendPortalChatMessage(e) {
     e.preventDefault();
     const input = document.getElementById('portalChatInput');
@@ -355,30 +714,49 @@ function sendPortalChatMessage(e) {
         </div>
     `;
     input.value = '';
+
+    // Add typing indicator
+    const typingId = 'typing_' + Date.now();
+    chatWin.innerHTML += `
+        <div class="d-flex align-items-start gap-2 mb-2" id="${typingId}">
+            <div class="rounded-circle bg-primary text-white p-2 d-flex align-items-center justify-content-center" style="width: 32px; height: 32px; font-size: 0.8rem;">
+                <i class="fas fa-robot"></i>
+            </div>
+            <div class="p-2 rounded-3 bg-white border small shadow-sm text-muted">
+                <i class="fas fa-spinner fa-spin me-1 text-primary"></i> Assistant is typing...
+            </div>
+        </div>
+    `;
     chatWin.scrollTop = chatWin.scrollHeight;
 
     // Fetch AI response
-    fetch('{{ url_for("features_v3_bp.api_multilingual_chatbot") }}', {
+    fetch('/api/chatbot', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: msg, age: {{ patient.age or 30 }} })
+        body: JSON.stringify({ message: msg })
     })
     .then(r => r.json())
     .then(data => {
-        const reply = data.reply || data.response || "I am here to help you. For urgent issues, please visit our clinic or call 108.";
+        const ind = document.getElementById(typingId);
+        if (ind) ind.remove();
+
+        const reply = data.reply || data.response || "I am here to help you. For urgent issues, please consult our camp doctors or call 108.";
         chatWin.innerHTML += `
             <div class="d-flex align-items-start gap-2 mb-2">
                 <div class="rounded-circle bg-primary text-white p-2 d-flex align-items-center justify-content-center" style="width: 32px; height: 32px; font-size: 0.8rem;">
                     <i class="fas fa-robot"></i>
                 </div>
                 <div class="p-2 rounded-3 bg-white border small shadow-sm" style="max-width: 85%;">
-                    ${reply}
+                    ${formatMarkdown(reply)}
                 </div>
             </div>
         `;
         chatWin.scrollTop = chatWin.scrollHeight;
     })
     .catch(err => {
+        const ind = document.getElementById(typingId);
+        if (ind) ind.remove();
+
         chatWin.innerHTML += `
             <div class="d-flex align-items-start gap-2 mb-2">
                 <div class="rounded-circle bg-primary text-white p-2 d-flex align-items-center justify-content-center" style="width: 32px; height: 32px; font-size: 0.8rem;">

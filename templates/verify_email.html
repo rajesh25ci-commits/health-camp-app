@@ -166,29 +166,13 @@
                 {% endif %}
             {% endwith %}
 
-            <!-- Demo Mode Helper Badge -->
-            {% if demo_otp %}
-            <div class="p-3 mb-4 rounded-3 text-start" style="background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.35);">
-                <div class="d-flex justify-content-between align-items-center mb-1">
-                    <span class="text-success fw-bold small"><i class="fa-solid fa-shield-halved me-1"></i> Demo Verification Code</span>
-                    <button type="button" class="btn btn-outline-success btn-sm py-0 px-2 rounded-pill" onclick="autofillDemo('{{ demo_otp }}')" style="font-size: 0.72rem;">
-                        <i class="fa-solid fa-wand-magic-sparkles me-1"></i> Autofill
-                    </button>
-                </div>
-                <div class="d-flex align-items-center gap-2">
-                    <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-50 fs-6 px-3 py-1 font-monospace">{{ demo_otp }}</span>
-                    <span class="text-muted" style="font-size: 0.72rem;">(Auto-generated for offline evaluation)</span>
-                </div>
-            </div>
-            {% endif %}
-
             <!-- OTP Form -->
             <form method="POST" action="{{ url_for('verify_email') }}">
                 <input type="hidden" name="email" value="{{ email }}">
 
                 <div class="mb-4">
                     <input type="text" class="form-control otp-input" id="otpInput" name="otp" placeholder="••••••" maxlength="6" required autofocus autocomplete="one-time-code" pattern="[0-9]{6}">
-                    <div class="text-muted small mt-2" style="font-size: 0.75rem;">Enter all 6 numeric digits</div>
+                    <div class="text-muted small mt-2" style="font-size: 0.75rem;">Enter 6 numeric digits sent to your Gmail inbox</div>
                 </div>
 
                 <button type="submit" class="btn btn-cinematic w-100 mb-3 d-flex align-items-center justify-content-center gap-2">
@@ -208,15 +192,5 @@
 
         </div>
     </div>
-
-    <script>
-        function autofillDemo(code) {
-            const input = document.getElementById('otpInput');
-            if (input) {
-                input.value = code;
-                input.focus();
-            }
-        }
-    </script>
 </body>
 </html>

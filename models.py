@@ -138,6 +138,7 @@ class Patient(db.Model):
     # Relationships
     appointments = db.relationship('Appointment', backref='patient', lazy=True, cascade='all, delete-orphan')
     health_records = db.relationship('HealthRecord', backref='patient', lazy=True, cascade='all, delete-orphan')
+    consultation_requests = db.relationship('ConsultationRequest', backref='patient', lazy=True, cascade='all, delete-orphan')
 
     @property
     def patient_id(self) -> str:
@@ -412,3 +413,87 @@ class Medicine(db.Model):
 
     def __repr__(self) -> str:
         return f"<Medicine id={self.id} name='{self.name}' batch='{self.batch_number}' qty={self.quantity}>"
+
+
+class ConsultationRequest(db.Model):
+    """
+    Patient Remote Symptom Report & Tele-Consultation Request.
+    Supports triage between 'Online Advice Only (No Camp Visit Needed)' and
+    'Want to Visit Physical Health Camp', and records doctor clinical tele-advice,
+    prescriptions, and diet guidance.
+    """
+    __tablename__ = 'consultation_requests'
+
+    id = db.Column(db.Integer, primary_key=True)
+    patient_id = db.Column(db.Integer, db.ForeignKey('patients.id', ondelete='CASCADE'), nullable=False)
+    doctor_id = db.Column(db.Integer, db.ForeignKey('doctors.id'), nullable=True)
+    camp_id = db.Column(db.Integer, db.ForeignKey('camps.id'), nullable=True)
+
+    # Patient submission details
+    symptoms = db.Column(db.Text, nullable=False)
+    duration = db.Column(db.String(100), nullable=True)
+    allergies = db.Column(db.Text, nullable=True, default='None')
+    consultation_preference = db.Column(
+        db.String(80),
+        default='Online Advice Only (No Camp Visit Needed)',
+        nullable=False
+    )
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    # Review status
+    status = db.Column(db.String(50), default='Pending Review', nullable=False)  # 'Pending Review' or 'Reviewed / Advice Sent'
+    reviewed_at = db.Column(db.DateTime, nullable=True)
+
+    # Doctor Response / Tele-advice fields
+    visit_decision = db.Column(db.String(150), nullable=True)
+    clinical_advice = db.Column(db.Text, nullable=True)
+    morning_tablets = db.Column(db.Text, nullable=True)
+    afternoon_tablets = db.Column(db.Text, nullable=True)
+    night_tablets = db.Column(db.Text, nullable=True)
+    diet_recommendations = db.Column(db.Text, nullable=True)
+
+    # Linked HealthRecord id
+    health_record_id = db.Column(db.Integer, db.ForeignKey('health_records.id'), nullable=True)
+
+    # Relationships
+    doctor = db.relationship('Doctor', backref=db.backref('consultation_requests', lazy=True))
+    camp = db.relationship('Camp', backref=db.backref('consultation_requests', lazy=True))
+    health_record = db.relationship('HealthRecord', backref=db.backref('consultation_request', uselist=False))
+
+    @property
+    def is_reviewed(self) -> bool:
+        return self.status == 'Reviewed / Advice Sent'
+
+    @property
+    def formatted_created_at(self) -> str:
+        return self.created_at.strftime('%d %b %Y, %I:%M %p')
+
+    @property
+    def formatted_reviewed_at(self) -> str:
+        return self.reviewed_at.strftime('%d %b %Y, %I:%M %p') if self.reviewed_at else 'Pending'
+
+    def to_dict(self) -> dict:
+        return {
+            'id': self.id,
+            'patient_id': self.patient_id,
+            'doctor_id': self.doctor_id,
+            'camp_id': self.camp_id,
+            'symptoms': self.symptoms,
+            'duration': self.duration,
+            'allergies': self.allergies,
+            'consultation_preference': self.consultation_preference,
+            'status': self.status,
+            'visit_decision': self.visit_decision,
+            'clinical_advice': self.clinical_advice,
+            'morning_tablets': self.morning_tablets,
+            'afternoon_tablets': self.afternoon_tablets,
+            'night_tablets': self.night_tablets,
+            'diet_recommendations': self.diet_recommendations,
+            'created_at': self.formatted_created_at,
+            'reviewed_at': self.formatted_reviewed_at
+        }
+
+
+# Model alias as requested by user specification
+SymptomReport = ConsultationRequest
+

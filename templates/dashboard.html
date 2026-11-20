@@ -171,6 +171,124 @@
         </div>
     </div>
 
+    <!-- SMS Notification Alert (After Consultation) -->
+    {% if session.get('last_consult_sms') %}
+    {% set sms_info = session.pop('last_consult_sms', None) %}
+    {% if sms_info %}
+    <div class="alert alert-success border-success border-2 rounded-4 shadow-sm mb-4 d-flex flex-wrap align-items-center justify-content-between p-3" role="alert">
+        <div class="d-flex align-items-center gap-3">
+            <div class="bg-success text-white rounded-circle p-2 d-flex align-items-center justify-content-center" style="width: 44px; height: 44px;">
+                <i class="fas fa-mobile-screen-button fs-4"></i>
+            </div>
+            <div>
+                <h6 class="fw-bold mb-0 text-success">Consultation Saved & Ready for Patient SMS Notification</h6>
+                <div class="small text-dark">
+                    Beneficiary: <strong>{{ sms_info.patient_name }}</strong> (Phone: {{ sms_info.phone_intl or sms_info.phone or 'Not provided' }})
+                    &bull; {{ sms_info.api_message }}
+                </div>
+            </div>
+        </div>
+        <div class="d-flex align-items-center gap-2 mt-2 mt-md-0">
+            <a href="{{ sms_info.sms_link }}" class="btn btn-success btn-sm rounded-pill px-3 fw-bold">
+                <i class="fas fa-comment-sms me-1"></i> Launch Phone SMS (+91)
+            </a>
+            <a href="{{ sms_info.wa_link }}" target="_blank" class="btn btn-outline-success btn-sm rounded-pill px-3 fw-bold">
+                <i class="fab fa-whatsapp me-1"></i> Send on WhatsApp
+            </a>
+        </div>
+    </div>
+    {% endif %}
+    {% endif %}
+
+    <!-- ======================================================== -->
+    <!-- INCOMING PATIENT SYMPTOM REPORTS & TELE-CONSULTATION QUEUE -->
+    <!-- ======================================================== -->
+    {% if consultation_requests %}
+    <div class="card border-0 shadow-sm rounded-4 mb-4 bg-white overflow-hidden border-top border-4 border-info">
+        <div class="card-header bg-white py-3 px-4 border-bottom d-flex justify-content-between align-items-center">
+            <div>
+                <h6 class="fw-bold mb-0 text-dark">
+                    <i class="fas fa-laptop-medical text-info me-2"></i>Incoming Patient Symptom Reports & Tele-Consultation Queue
+                </h6>
+                <small class="text-muted">Remote patient reports: Online Advice vs Physical Camp Visit triage</small>
+            </div>
+            <span class="badge bg-warning text-dark rounded-pill px-3 py-1">
+                {{ pending_requests_count }} Pending Review
+            </span>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr class="small text-muted text-uppercase">
+                            <th class="ps-4">Submitted</th>
+                            <th>Patient Beneficiary</th>
+                            <th>Consultation Preference</th>
+                            <th>Reported Symptoms & Allergies</th>
+                            <th>Status</th>
+                            <th class="text-end pe-4">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for req in consultation_requests %}
+                        <tr class="{% if req.status == 'Pending Review' %}table-warning border-start border-warning border-3{% endif %}">
+                            <td class="ps-4 text-nowrap">
+                                <div class="fw-bold text-dark small">{{ req.created_at.strftime('%d %b %Y') }}</div>
+                                <small class="text-muted">{{ req.created_at.strftime('%H:%M') }}</small>
+                            </td>
+                            <td>
+                                <a href="{{ url_for('patient_detail', id=req.patient.id) }}" class="fw-bold text-dark text-decoration-none d-block">
+                                    {{ req.patient.name }}
+                                </a>
+                                <small class="text-muted font-monospace" style="font-size: 0.75rem;">
+                                    {{ req.patient.patient_uid }} &bull; {{ req.patient.age }} yrs ({{ req.patient.gender }})
+                                </small>
+                            </td>
+                            <td>
+                                {% if 'online' in req.consultation_preference.lower() or 'sirf' in req.consultation_preference.lower() %}
+                                    <span class="badge bg-info text-dark px-2 py-1 rounded-pill">
+                                        <i class="fas fa-laptop-medical me-1"></i> Sirf Advice Chahiye (Online Advice Only)
+                                    </span>
+                                {% else %}
+                                    <span class="badge bg-primary text-white px-2 py-1 rounded-pill">
+                                        <i class="fas fa-tent me-1"></i> Camp Ko Aana Hai (Physical Camp Visit)
+                                    </span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="p-2 rounded bg-light border small text-dark font-monospace mb-1" style="max-width: 280px;">
+                                    {{ req.symptoms }}
+                                </div>
+                                <div class="small text-muted" style="font-size: 0.75rem;">
+                                    <span>Duration: <b>{{ req.duration or '1-2 Days' }}</b></span> &bull;
+                                    <span>Allergies: <b class="{% if req.allergies and req.allergies.lower() != 'none' %}text-danger{% else %}text-success{% endif %}">{{ req.allergies or 'None' }}</b></span>
+                                </div>
+                            </td>
+                            <td>
+                                {% if req.is_reviewed %}
+                                    <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1 rounded-pill" style="font-size: 0.72rem;">
+                                        <i class="fas fa-circle-check me-1"></i> Reviewed
+                                    </span>
+                                {% else %}
+                                    <span class="badge bg-warning text-dark px-2 py-1 rounded-pill" style="font-size: 0.72rem;">
+                                        <i class="fas fa-hourglass-half me-1"></i> Pending Review
+                                    </span>
+                                {% endif %}
+                            </td>
+                            <td class="text-end pe-4 text-nowrap">
+                                <a href="{{ url_for('doctor_consult_patient', patient_id=req.patient.id) }}" class="btn btn-sm btn-primary rounded-pill px-3 shadow-sm" title="Consult and prescribe for this patient directly">
+                                    <i class="fas fa-user-doctor me-1"></i> Consult
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     <!-- Middle Section: Priority Doctor Queue & Side Alerts -->
     <div class="row g-4 mb-4">
         <!-- Prioritized Doctor Queue -->
@@ -238,7 +356,7 @@
                                             </a>
                                         </td>
                                         <td class="text-end pe-4">
-                                            <a href="{{ url_for('records') }}?patient_id={{ p.id }}" class="btn btn-sm btn-primary rounded-pill px-3 shadow-sm" title="Consult Patient">
+                                            <a href="{{ url_for('doctor_consult_patient', patient_id=p.id) }}" class="btn btn-sm btn-primary rounded-pill px-3 shadow-sm" title="Consult this patient directly">
                                                 <i class="fas fa-user-doctor me-1"></i> Consult
                                             </a>
                                         </td>

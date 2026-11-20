@@ -33,11 +33,13 @@ from flask_login import (
 from werkzeug.utils import secure_filename
 
 from config import Config
-from models import db, User, Patient, Doctor, Camp, Appointment, HealthRecord, Medicine
+from models import (
+    db, User, Patient, Doctor, Camp, Appointment, HealthRecord, Medicine,
+    ConsultationRequest, SymptomReport, generate_10_digit_patient_id
+)
 from functools import wraps
 import random
 from email_service import send_otp_email
-from models import generate_10_digit_patient_id
 from flask import session
 
 from utils import (
@@ -47,7 +49,8 @@ from utils import (
     regenerate_patient_qr_codes,
     generate_camp_pdf,
     ensure_default_qr,
-    ensure_default_avatar
+    ensure_default_avatar,
+    generate_official_prescription_package
 )
 from upgraded_features_v3 import (
     features_v3_bp,
@@ -201,7 +204,7 @@ def create_app(config_class=Config) -> Flask:
         age_raw = request.form.get('age', '').strip()
         gender = request.form.get('gender', 'Other').strip()
         blood_group = request.form.get('blood_group', '').strip()
-        allergies = request.form.get('allergies', '').strip()
+        allergies = request.form.get('allergies', 'None').strip() or 'None'
         phone = request.form.get('phone', '').strip()
         country = request.form.get('country', 'India').strip()
         state = request.form.get('state', '').strip()
@@ -252,6 +255,19 @@ def create_app(config_class=Config) -> Flask:
         # Generate unique 10-digit Patient numeric ID
         ten_digit_id = generate_10_digit_patient_id()
 
+        # Handle Beneficiary Photo Upload
+        photo = request.files.get('photo')
+        photo_filename = None
+        if photo and photo.filename and allowed_file(photo.filename):
+            try:
+                import time
+                from werkzeug.utils import secure_filename
+                ext = os.path.splitext(secure_filename(photo.filename))[1]
+                photo_filename = f"pt_{ten_digit_id}_{int(time.time())}{ext}"
+                photo.save(os.path.join(app.config['UPLOAD_FOLDER'], photo_filename))
+            except Exception as e:
+                print(f"[WARN] Beneficiary photo save notice: {e}")
+
         # Create Patient Demographic Record
         patient = Patient(
             patient_uid=ten_digit_id,
@@ -269,6 +285,7 @@ def create_app(config_class=Config) -> Flask:
             city=city,
             address=address,
             email=email,
+            photo_filename=photo_filename,
             urgency_level='NORMAL'
         )
         db.session.add(patient)
@@ -299,14 +316,14 @@ def create_app(config_class=Config) -> Flask:
         db.session.add(new_user)
         db.session.commit()
 
-        # Dispatch OTP via SMTP (with demo-mode fallback)
+        # Dispatch OTP strictly via Gmail SMTP
         email_sent, sent_msg = send_otp_email(email, otp_code, new_user.full_name)
         session['pending_verification_email'] = email
 
         if email_sent:
-            flash(f'Verification code sent to {email}. Please enter the 6-digit OTP below to activate your account.', 'success')
+            flash(f'Verification code sent to {email}. Please check your Gmail inbox and enter the 6-digit OTP below to activate your account.', 'success')
         else:
-            flash(f'Account created! (Demo Verification Code: {otp_code}). Please enter the 6-digit OTP below to verify your email.', 'info')
+            flash(f'Could not dispatch verification email: {sent_msg}. Please configure MAIL_USERNAME and MAIL_APP_PASSWORD in .env.', 'danger')
 
         return redirect(url_for('verify_email', email=email))
 
@@ -328,7 +345,7 @@ def create_app(config_class=Config) -> Flask:
 
             if not submitted_email or not submitted_otp:
                 flash('Please provide both your registered email and the 6-digit OTP.', 'danger')
-                return render_template('verify_email.html', email=submitted_email, demo_otp=getattr(user, 'verification_otp', None))
+                return render_template('verify_email.html', email=submitted_email)
 
             v_user = User.query.filter(func.lower(User.email) == submitted_email).first()
             if not v_user:
@@ -340,8 +357,8 @@ def create_app(config_class=Config) -> Flask:
                 return redirect(url_for('login', portal='patient', tab='signin'))
 
             if not v_user.verification_otp or v_user.verification_otp.strip() != submitted_otp:
-                flash('Invalid or expired verification code. Please check the OTP and try again.', 'danger')
-                return render_template('verify_email.html', email=submitted_email, demo_otp=v_user.verification_otp)
+                flash('Invalid or expired verification code. Please check your Gmail and try again.', 'danger')
+                return render_template('verify_email.html', email=submitted_email)
 
             # Verification successful
             v_user.is_email_verified = True
@@ -352,8 +369,7 @@ def create_app(config_class=Config) -> Flask:
             flash(f'Email verified successfully! Welcome, {v_user.full_name or "Patient"}. Please sign in to access your digital health portal.', 'success')
             return redirect(url_for('login', portal='patient', tab='signin'))
 
-        demo_code = user.verification_otp if user and not user.is_email_verified else None
-        return render_template('verify_email.html', email=target_email, demo_otp=demo_code)
+        return render_template('verify_email.html', email=target_email)
 
     @app.route('/resend-otp')
     def resend_otp():
@@ -377,13 +393,13 @@ def create_app(config_class=Config) -> Flask:
         user.otp_created_at = datetime.utcnow()
         db.session.commit()
 
-        email_sent, _ = send_otp_email(user.email, new_otp, user.full_name)
+        email_sent, sent_msg = send_otp_email(user.email, new_otp, user.full_name)
         session['pending_verification_email'] = user.email
 
         if email_sent:
-            flash(f'A fresh verification code has been dispatched to {user.email}.', 'success')
+            flash(f'A fresh verification code has been dispatched to {user.email}. Please check your inbox.', 'success')
         else:
-            flash(f'New verification code generated! (Demo Code: {new_otp})', 'info')
+            flash(f'Could not dispatch email: {sent_msg}. Please configure MAIL_USERNAME and MAIL_APP_PASSWORD in .env.', 'danger')
 
         return redirect(url_for('verify_email', email=user.email))
 
@@ -591,9 +607,11 @@ def create_app(config_class=Config) -> Flask:
         if not os.path.exists(qr_path):
             generate_qr_code(patient.patient_uid, app.config['QRCODE_FOLDER'], patient=patient)
 
-        # Strictly fetch this patient's records
+        # Strictly fetch this patient's records and remote consultation requests
         records = HealthRecord.query.filter_by(patient_id=patient.id).order_by(HealthRecord.created_at.desc()).all()
         latest_record = records[0] if records else None
+        consultation_requests = ConsultationRequest.query.filter_by(patient_id=patient.id).order_by(ConsultationRequest.created_at.desc()).all()
+        latest_consultation = consultation_requests[0] if consultation_requests else None
         ambulance_log = AmbulanceDispatchLog.query.filter_by(patient_id=patient.id).order_by(AmbulanceDispatchLog.dispatched_at.desc()).first()
 
         # Clinical aids
@@ -606,6 +624,15 @@ def create_app(config_class=Config) -> Flask:
         wellness = calculate_patient_wellness_score(patient, latest_record)
         journey_steps = get_patient_journey_steps(patient, latest_record)
         symptom_schedule = get_symptom_based_prescription(getattr(patient, 'symptoms', ''), patient.age or 30, getattr(patient, 'urgency_level', 'NORMAL'))
+
+        # Dynamic official WhatsApp & SMS prescription package
+        official_pkg = generate_official_prescription_package(
+            patient,
+            consultation_request=latest_consultation,
+            health_record=latest_record
+        )
+        whatsapp_url = official_pkg['whatsapp_url']
+        sms_url = official_pkg['sms_url']
 
         # Photo URL
         photo_url = None
@@ -623,16 +650,282 @@ def create_app(config_class=Config) -> Flask:
             patient=patient,
             records=records,
             latest_record=latest_record,
+            consultation_requests=consultation_requests,
+            latest_consultation=latest_consultation,
+            official_pkg=official_pkg,
             photo_url=photo_url,
             verification_url=verification_url,
             diet_plan=diet_plan,
             med_schedule=med_schedule,
-            whatsapp_url=med_schedule.get('whatsapp_url', '#'),
+            whatsapp_url=whatsapp_url,
+            sms_url=sms_url,
             ambulance_log=ambulance_log,
             wellness=wellness,
             journey_steps=journey_steps,
             symptom_schedule=symptom_schedule
         )
+
+    @app.route('/patient/submit-symptoms', methods=['POST'])
+    @login_required
+    @patient_only
+    def patient_submit_symptoms():
+        """
+        Allows authenticated patient to submit remote symptoms, allergies, duration,
+        and select consultation preference: 'Sirf Advice Chahiye (Online Advice Only)'
+        vs 'Camp Ko Aana Hai (Physical Camp Visit)'.
+        """
+        patient = current_user.patient_record
+        if not patient and current_user.patient_id:
+            patient = db.session.get(Patient, current_user.patient_id)
+
+        if not patient:
+            flash('Beneficiary profile not found. Please contact support.', 'danger')
+            return redirect(url_for('my_health_portal'))
+
+        symptoms = request.form.get('symptoms', '').strip()
+        allergies = request.form.get('allergies', '').strip()
+        duration = request.form.get('duration', '1-2 days').strip()
+        preference = request.form.get('consultation_preference', 'Sirf Advice Chahiye (Online Advice Only)').strip()
+
+        if not symptoms:
+            flash('Please describe your symptoms and concerns before submitting.', 'warning')
+            return redirect(url_for('my_health_portal'))
+
+        # Update patient demographic symptoms and allergies
+        patient.symptoms = symptoms
+        if allergies:
+            patient.allergies = allergies
+
+        new_req = ConsultationRequest(
+            patient_id=patient.id,
+            symptoms=symptoms,
+            duration=duration,
+            allergies=allergies or patient.allergies or 'None',
+            consultation_preference=preference,
+            status='Pending Review'
+        )
+        db.session.add(new_req)
+        db.session.commit()
+
+        flash('Your health report has been submitted to camp doctors! Clinical tele-advice and tablet dosage will appear here in real time once reviewed.', 'success')
+        return redirect(url_for('my_health_portal'))
+
+    @app.route('/consult/<int:patient_id>', methods=['GET', 'POST'])
+    @login_required
+    @staff_only
+    def doctor_consult_patient(patient_id):
+        """
+        Direct Doctor Consultation Action pre-bound to exact patient.
+        Streamlined for Online Advice and in-person consultations:
+        - Automatically binds current doctor (current_user)
+        - Automatically assigns active camp venue
+        - Removes camp, doctor, and vitals selection overhead
+        - Directly captures Priority (Normal/Urgent), Primary Diagnosis,
+          Prescription & Dosage (with pharmacy deduction), and Clinical Notes/Diet
+        - Synchronizes Patient Portal in real time and triggers phone SMS notification
+        """
+        patient = db.session.get(Patient, patient_id)
+        if not patient:
+            flash('Patient beneficiary record not found.', 'danger')
+            return redirect(url_for('dashboard'))
+
+        consultation_request = ConsultationRequest.query.filter_by(
+            patient_id=patient.id
+        ).order_by(ConsultationRequest.created_at.desc()).first()
+
+        active_camp = Camp.query.filter(Camp.status != 'Completed').order_by(Camp.date.desc()).first()
+        if not active_camp:
+            active_camp = Camp.query.order_by(Camp.date.desc()).first()
+
+        if request.method == 'POST':
+            priority = request.form.get('priority', 'Normal').strip()
+            diagnosis = request.form.get('diagnosis', '').strip()
+            prescription = request.form.get('prescription', '').strip()
+            doctor_notes = request.form.get('doctor_notes', '').strip()
+
+            if not diagnosis:
+                flash('Primary Diagnosis is a mandatory clinical field.', 'danger')
+                return render_template(
+                    'consult.html',
+                    patient=patient,
+                    consultation_request=consultation_request,
+                    active_camp=active_camp
+                )
+
+            # Resolve Doctor entity for current_user
+            doctor = Doctor.query.filter(
+                (Doctor.email == current_user.email) | (Doctor.name == current_user.full_name)
+            ).first()
+            if not doctor:
+                doctor = Doctor(
+                    name=current_user.full_name or current_user.username,
+                    specialization=getattr(current_user, 'specialization', 'Camp Medical Officer') or 'Camp Medical Officer',
+                    qualification=getattr(current_user, 'qualification', 'MBBS') or 'MBBS',
+                    license_number=getattr(current_user, 'license_number', 'REG-2026') or 'REG-2026',
+                    email=current_user.email,
+                    phone=current_user.phone
+                )
+                db.session.add(doctor)
+                db.session.flush()
+
+            # Resolve Camp
+            camp = active_camp
+            if not camp:
+                camp = Camp(
+                    title="Smart Community Health Camp",
+                    location_name=patient.location_display or "Central Outreach Camp",
+                    date=date.today(),
+                    status="Ongoing"
+                )
+                db.session.add(camp)
+                db.session.flush()
+
+            # Priority & Urgency Update
+            is_urgent = (priority.upper() == 'URGENT')
+            patient.urgency_level = 'URGENT' if is_urgent else 'NORMAL'
+
+            # 1. Create HealthRecord
+            new_record = HealthRecord(
+                patient_id=patient.id,
+                doctor_id=doctor.id,
+                camp_id=camp.id,
+                diagnosis=diagnosis,
+                prescription=prescription if prescription else None,
+                doctor_notes=doctor_notes if doctor_notes else None,
+                is_critical=is_urgent,
+                triage_priority='URGENT_YELLOW' if is_urgent else 'NORMAL_GREEN'
+            )
+            db.session.add(new_record)
+            db.session.flush()
+
+            # 2. Update ConsultationRequest if present
+            target_req = consultation_request
+            if target_req:
+                target_req.doctor_id = doctor.id
+                target_req.camp_id = camp.id
+                target_req.clinical_advice = diagnosis
+                target_req.diet_recommendations = doctor_notes
+                target_req.visit_decision = f"{target_req.consultation_preference} (Flagged {priority})"
+                target_req.health_record_id = new_record.id
+                target_req.status = 'Reviewed / Advice Sent'
+                target_req.reviewed_at = datetime.utcnow()
+
+            # 3. Deduct pharmacy inventory
+            if prescription:
+                deduct_medicine_inventory(prescription)
+
+            db.session.commit()
+
+            # 4. Generate dynamic SMS & WhatsApp notification package
+            from sms_service import build_consultation_sms_package
+            sms_pkg = build_consultation_sms_package(
+                patient=patient,
+                doctor_name=doctor.name,
+                diagnosis=diagnosis,
+                prescription=prescription,
+                doctor_notes=doctor_notes,
+                priority=priority,
+                host_url=request.host_url
+            )
+            session['last_consult_sms'] = {
+                'patient_name': patient.name,
+                'phone': patient.phone,
+                'phone_intl': sms_pkg['phone_intl'],
+                'sms_link': sms_pkg['sms_link'],
+                'wa_link': sms_pkg['wa_link'],
+                'api_dispatched': sms_pkg['api_dispatched'],
+                'api_message': sms_pkg['api_message']
+            }
+
+            flash(f"Clinical consultation saved successfully for {patient.name}! Updated on their Patient Portal instantaneously.", "success")
+            return redirect(url_for('dashboard'))
+
+        return render_template(
+            'consult.html',
+            patient=patient,
+            consultation_request=consultation_request,
+            active_camp=active_camp
+        )
+
+    @app.route('/doctor/respond-consultation/<int:request_id>', methods=['POST'])
+    @login_required
+    @staff_only
+    def doctor_respond_consultation(request_id):
+        """
+        Doctor reviews remote patient symptom report, determines visit decision
+        (Online Advice vs Physical Camp Visit), enters diagnosis, specifies tablets
+        with Morning / Afternoon / Night dosage, and custom food/diet advice.
+        Pushes updates to the patient portal in real-time.
+        """
+        req = db.session.get(ConsultationRequest, request_id)
+        if not req:
+            flash('Consultation request record not found.', 'danger')
+            return redirect(request.referrer or url_for('dashboard'))
+
+        doctor_id = request.form.get('doctor_id', type=int)
+        camp_id = request.form.get('camp_id', type=int)
+        visit_decision = request.form.get('visit_decision', 'Online Advice: Rest at home & take online medicines').strip()
+        clinical_advice = request.form.get('clinical_advice', '').strip()
+        morning_tablets = request.form.get('morning_tablets', '').strip()
+        afternoon_tablets = request.form.get('afternoon_tablets', '').strip()
+        night_tablets = request.form.get('night_tablets', '').strip()
+        diet_recommendations = request.form.get('diet_recommendations', '').strip()
+
+        if not clinical_advice or not camp_id or not doctor_id:
+            flash('Please select Camp Venue, Attending Doctor, and enter Clinical Advice.', 'danger')
+            return redirect(request.referrer or url_for('dashboard'))
+
+        req.doctor_id = doctor_id
+        req.camp_id = camp_id
+        req.visit_decision = visit_decision
+        req.clinical_advice = clinical_advice
+        req.morning_tablets = morning_tablets if morning_tablets else None
+        req.afternoon_tablets = afternoon_tablets if afternoon_tablets else None
+        req.night_tablets = night_tablets if night_tablets else None
+        req.diet_recommendations = diet_recommendations if diet_recommendations else None
+        req.status = 'Reviewed / Advice Sent'
+        req.reviewed_at = datetime.utcnow()
+
+        # Build structured prescription summary
+        rx_lines = []
+        if morning_tablets: rx_lines.append(f"Morning (08:00 AM): {morning_tablets}")
+        if afternoon_tablets: rx_lines.append(f"Afternoon (01:30 PM): {afternoon_tablets}")
+        if night_tablets: rx_lines.append(f"Night (08:30 PM): {night_tablets}")
+        full_prescription = "\n".join(rx_lines) if rx_lines else "Rest and hydration as instructed by camp physician."
+
+        is_crit = ('emergency' in visit_decision.lower())
+
+        # Create linked HealthRecord
+        health_rec = HealthRecord(
+            patient_id=req.patient_id,
+            doctor_id=doctor_id,
+            camp_id=camp_id,
+            diagnosis=clinical_advice,
+            prescription=full_prescription,
+            doctor_notes=f"Visit Decision: {visit_decision}\nDiet: {diet_recommendations}",
+            is_critical=is_crit,
+            triage_priority='EMERGENCY_RED' if is_crit else 'NORMAL_GREEN'
+        )
+        db.session.add(health_rec)
+        db.session.flush()
+        req.health_record_id = health_rec.id
+
+        # Deduct pharmacy inventory if applicable
+        deduct_medicine_inventory(full_prescription)
+
+        db.session.commit()
+
+        # Generate dynamic official prescription package
+        pkg = generate_official_prescription_package(
+            req.patient,
+            doctor=db.session.get(Doctor, doctor_id),
+            camp=db.session.get(Camp, camp_id),
+            consultation_request=req,
+            health_record=health_rec
+        )
+
+        flash(f"Clinical advice & prescription successfully sent to {req.patient.name}! Updated on their Patient Portal in real time.", 'success')
+        return redirect(request.referrer or url_for('dashboard'))
 
     @app.route('/verify-pass/<patient_uid>')
     def verify_pass(patient_uid):
@@ -725,6 +1018,13 @@ def create_app(config_class=Config) -> Flask:
         med_labels = [m.name for m in all_medicines]
         med_quantities = [m.quantity for m in all_medicines]
 
+        # Incoming Remote Symptom Reports & Consultation Requests
+        consultation_requests = ConsultationRequest.query.order_by(
+            case((ConsultationRequest.status == 'Pending Review', 1), else_=2),
+            ConsultationRequest.created_at.desc()
+        ).all()
+        pending_requests_count = len([r for r in consultation_requests if r.status == 'Pending Review'])
+
         return render_template(
             'dashboard.html',
             total_patients=total_patients,
@@ -738,7 +1038,11 @@ def create_app(config_class=Config) -> Flask:
             age_data=age_data,
             med_labels=med_labels,
             med_quantities=med_quantities,
-            gamification=gamification
+            gamification=gamification,
+            consultation_requests=consultation_requests,
+            pending_requests_count=pending_requests_count,
+            all_doctors=all_doctors,
+            all_camps=all_camps
         )
 
     # ==========================================
@@ -1369,6 +1673,10 @@ def create_app(config_class=Config) -> Flask:
 
         selected_patient_id = request.args.get('patient_id', type=int)
         critical_records = [r for r in records_list if getattr(r, 'is_critical', False)]
+        consultation_requests = ConsultationRequest.query.order_by(
+            case((ConsultationRequest.status == 'Pending Review', 1), else_=2),
+            ConsultationRequest.created_at.desc()
+        ).all()
 
         return render_template(
             'records.html',
@@ -1379,6 +1687,7 @@ def create_app(config_class=Config) -> Flask:
             inventory_items=inventory_items,
             ambulance_logs=ambulance_logs,
             critical_records=critical_records,
+            consultation_requests=consultation_requests,
             selected_patient_id=selected_patient_id
         )
 

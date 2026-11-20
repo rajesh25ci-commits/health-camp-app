@@ -164,21 +164,26 @@
                                         </a>
                                     </td>
                                     <td class="text-end pe-3">
-                                        <div class="btn-group btn-group-sm">
-                                            <a href="{{ url_for('patient_card', id=p.id) }}" class="btn btn-outline-warning text-dark" title="Digital ID Card">
-                                                <i class="fas fa-id-card"></i>
+                                        <div class="d-flex align-items-center justify-content-end gap-1">
+                                            <a href="{{ url_for('doctor_consult_patient', patient_id=p.id) }}" class="btn btn-sm btn-primary rounded-pill px-2 shadow-sm" title="Consult Patient Directly">
+                                                <i class="fas fa-user-doctor me-1"></i> Consult
                                             </a>
-                                            <a href="{{ url_for('patient_detail', id=p.id) }}" class="btn btn-outline-primary" title="View Clinical Profile">
-                                                <i class="fa-solid fa-eye"></i>
-                                            </a>
-                                            <a href="{{ url_for('patient_pdf', id=p.id) }}" class="btn btn-outline-danger" title="Download Official Medical Card">
-                                                <i class="fa-solid fa-file-pdf"></i>
-                                            </a>
-                                            <form method="POST" action="{{ url_for('patient_delete', id=p.id) }}" onsubmit="return confirm('Are you sure you want to delete patient {{ p.name }}? This will remove all associated health records.');" class="d-inline">
-                                                <button type="submit" class="btn btn-outline-secondary" title="Delete Patient Record">
-                                                    <i class="fa-solid fa-trash-can"></i>
-                                                </button>
-                                            </form>
+                                            <div class="btn-group btn-group-sm">
+                                                <a href="{{ url_for('patient_card', id=p.id) }}" class="btn btn-outline-warning text-dark" title="Digital ID Card">
+                                                    <i class="fas fa-id-card"></i>
+                                                </a>
+                                                <a href="{{ url_for('patient_detail', id=p.id) }}" class="btn btn-outline-primary" title="View Clinical Profile">
+                                                    <i class="fa-solid fa-eye"></i>
+                                                </a>
+                                                <a href="{{ url_for('patient_pdf', id=p.id) }}" class="btn btn-outline-danger" title="Download Official Medical Card">
+                                                    <i class="fa-solid fa-file-pdf"></i>
+                                                </a>
+                                                <form method="POST" action="{{ url_for('patient_delete', id=p.id) }}" onsubmit="return confirm('Are you sure you want to delete patient {{ p.name }}? This will remove all associated health records.');" class="d-inline">
+                                                    <button type="submit" class="btn btn-outline-secondary" title="Delete Patient Record">
+                                                        <i class="fa-solid fa-trash-can"></i>
+                                                    </button>
+                                                </form>
+                                            </div>
                                         </div>
                                     </td>
                                 </tr>

@@ -768,3 +768,177 @@ def generate_camp_pdf(camp, appointments=None, output_path: str = None):
         buffer.seek(0)
         return buffer
     return output_path
+
+
+def generate_official_prescription_package(
+    patient,
+    doctor=None,
+    camp=None,
+    consultation_request=None,
+    health_record=None,
+    base_url: str = None
+) -> dict:
+    """
+    Generate an official, dynamic WhatsApp and SMS prescription message package
+    matching the exact clinical template required for smart community health camps.
+    Never uses hardcoded 127.0.0.1; dynamically resolves host_url.
+    """
+    import urllib.parse
+    from flask import has_request_context, request
+
+    # Dynamic host_url resolution
+    if base_url:
+        host_url = base_url.rstrip('/')
+    elif has_request_context():
+        host_url = request.host_url.rstrip('/')
+    else:
+        host_url = os.environ.get('BASE_APP_URL', 'https://health-camp-app.onrender.com').rstrip('/')
+
+    # Patient info
+    patient_name = getattr(patient, 'display_name', getattr(patient, 'name', 'Beneficiary'))
+    patient_uid = getattr(patient, 'patient_uid', getattr(patient, 'patient_id', 'PAT-2026'))
+
+    # Doctor info
+    doc_obj = doctor
+    if not doc_obj and consultation_request and getattr(consultation_request, 'doctor', None):
+        doc_obj = consultation_request.doctor
+    if not doc_obj and health_record and getattr(health_record, 'doctor', None):
+        doc_obj = health_record.doctor
+
+    doctor_name = getattr(doc_obj, 'name', 'Camp Medical Officer')
+    if not doctor_name.startswith('Dr.') and not doctor_name.startswith('Dr '):
+        doctor_display = f"Dr. {doctor_name}"
+    else:
+        doctor_display = doctor_name
+    doctor_spec = getattr(doc_obj, 'specialization', 'General Physician')
+
+    # Camp info
+    camp_obj = camp
+    if not camp_obj and consultation_request and getattr(consultation_request, 'camp', None):
+        camp_obj = consultation_request.camp
+    if not camp_obj and health_record and getattr(health_record, 'camp', None):
+        camp_obj = health_record.camp
+    camp_title = getattr(camp_obj, 'title', getattr(camp_obj, 'location_name', 'Community Health Camp'))
+
+    # Date
+    encounter_dt = None
+    if consultation_request and getattr(consultation_request, 'reviewed_at', None):
+        encounter_dt = consultation_request.reviewed_at
+    elif health_record and getattr(health_record, 'created_at', None):
+        encounter_dt = health_record.created_at
+    elif consultation_request and getattr(consultation_request, 'created_at', None):
+        encounter_dt = consultation_request.created_at
+    else:
+        encounter_dt = datetime.now()
+    date_str = encounter_dt.strftime('%d %b %Y')
+
+    # Symptoms
+    symptoms_text = (
+        (consultation_request.symptoms if consultation_request and getattr(consultation_request, 'symptoms', None) else None) or
+        getattr(patient, 'symptoms', None) or
+        'General clinical evaluation'
+    )
+
+    # Diagnosis / Clinical Advice
+    advice_text = (
+        (consultation_request.clinical_advice if consultation_request and getattr(consultation_request, 'clinical_advice', None) else None) or
+        (health_record.diagnosis if health_record and getattr(health_record, 'diagnosis', None) else None) or
+        'Routine health evaluation & supportive care'
+    )
+
+    # Tablets & Dosage
+    morning_text = 'None'
+    afternoon_text = 'None'
+    night_text = 'None'
+
+    if consultation_request:
+        if getattr(consultation_request, 'morning_tablets', None) and consultation_request.morning_tablets.strip():
+            morning_text = consultation_request.morning_tablets.strip()
+        if getattr(consultation_request, 'afternoon_tablets', None) and consultation_request.afternoon_tablets.strip():
+            afternoon_text = consultation_request.afternoon_tablets.strip()
+        if getattr(consultation_request, 'night_tablets', None) and consultation_request.night_tablets.strip():
+            night_text = consultation_request.night_tablets.strip()
+
+    if morning_text == 'None' and afternoon_text == 'None' and night_text == 'None' and health_record and getattr(health_record, 'prescription', None):
+        rx_lines = [l.strip() for l in health_record.prescription.split('\n') if l.strip()]
+        m_list, a_list, n_list = [], [], []
+        for l in rx_lines:
+            lower = l.lower()
+            if 'morning' in lower or 'breakfast' in lower or 'subah' in lower:
+                m_list.append(l)
+            elif 'afternoon' in lower or 'lunch' in lower or 'dopahar' in lower:
+                a_list.append(l)
+            elif 'night' in lower or 'dinner' in lower or 'bedtime' in lower or 'raat' in lower:
+                n_list.append(l)
+            else:
+                m_list.append(l)
+                n_list.append(l)
+        if m_list: morning_text = " | ".join(m_list)
+        if a_list: afternoon_text = " | ".join(a_list)
+        if n_list: night_text = " | ".join(n_list)
+
+    # Food & Diet Recommendations
+    diet_text = (
+        (consultation_request.diet_recommendations if consultation_request and getattr(consultation_request, 'diet_recommendations', None) else None) or
+        'Freshly cooked nutritious meals, adequate hydration, avoid excess salt, oil, and sugar.'
+    )
+
+    # Build Exact Clinical Message
+    message_text = (
+        f"🏥 *SMART COMMUNITY HEALTH CAMP - OFFICIAL PRESCRIPTION*\n"
+        f"👤 *Patient:* {patient_name} ({patient_uid})\n"
+        f"👨‍⚕️ *Doctor:* {doctor_display} ({doctor_spec})\n"
+        f"⛺ *Camp:* {camp_title}\n"
+        f"📅 *Date:* {date_str}\n"
+        f"--------------------------------------\n"
+        f"🩺 *SYMPTOMS & DIAGNOSIS:*\n"
+        f"- Symptoms: {symptoms_text}\n"
+        f"- Diagnosis / Advice: {advice_text}\n"
+        f"--------------------------------------\n"
+        f"💊 *TABLETS & DOSAGE SCHEDULE:*\n"
+        f"🌅 *Morning (08:00 AM - After Breakfast):*\n"
+        f"{morning_text}\n"
+        f"☀️ *Afternoon (01:30 PM - After Lunch):*\n"
+        f"{afternoon_text}\n"
+        f"🌙 *Night (08:30 PM - After Dinner):*\n"
+        f"{night_text}\n"
+        f"--------------------------------------\n"
+        f"🥗 *FOOD & DIET RECOMMENDATIONS:*\n"
+        f"{diet_text}\n"
+        f"--------------------------------------\n"
+        f"🔗 *View Full Digital Report & Pass:* {host_url}/verify-pass/{patient_uid}\n"
+        f"🚨 *Emergency Helpline:* 108"
+    )
+
+    # Phone formatting
+    raw_phone = str(getattr(patient, 'phone', '') or '')
+    phone_digits = "".join(ch for ch in raw_phone if ch.isdigit())
+    if len(phone_digits) == 10:
+        phone_intl = "91" + phone_digits
+    elif len(phone_digits) > 10:
+        phone_intl = phone_digits
+    else:
+        phone_intl = ""
+
+    encoded_msg = urllib.parse.quote(message_text)
+
+    # Dynamic wa.me and sms links
+    if phone_intl:
+        whatsapp_url = f"https://wa.me/{phone_intl}?text={encoded_msg}"
+        sms_url = f"sms:{phone_intl}?body={encoded_msg}"
+    else:
+        whatsapp_url = f"https://wa.me/?text={encoded_msg}"
+        sms_url = f"sms:?body={encoded_msg}"
+
+    return {
+        'message_text': message_text,
+        'whatsapp_url': whatsapp_url,
+        'sms_url': sms_url,
+        'morning_text': morning_text,
+        'afternoon_text': afternoon_text,
+        'night_text': night_text,
+        'diet_text': diet_text,
+        'host_url': host_url,
+        'phone': phone_intl
+    }
+

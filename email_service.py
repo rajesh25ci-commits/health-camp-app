@@ -1,7 +1,8 @@
 """
-email_service.py - SMTP Email Dispatcher for Smart Community Health Camp
-Sends 6-digit verification OTPs to registered patient email addresses.
-Includes graceful fallback and logging for demo and testing environments.
+email_service.py - Real Gmail SMTP Email Dispatcher for Smart Community Health Camp
+Strictly sends 6-digit verification OTPs to registered patient email addresses using
+Gmail SMTP (smtp.gmail.com:587 with TLS) and MAIL_USERNAME / MAIL_APP_PASSWORD from .env.
+Never leaks OTPs on screen or in flash messages.
 """
 
 import os
@@ -13,34 +14,34 @@ from datetime import datetime
 
 def send_otp_email(to_email: str, otp: str, patient_name: str = "Valued Patient") -> tuple[bool, str]:
     """
-    Send a 6-digit email verification OTP to a newly registered patient.
+    Send a 6-digit email verification OTP strictly to the patient's entered email address
+    via Gmail SMTP (smtp.gmail.com:587) using MAIL_USERNAME and MAIL_APP_PASSWORD from .env.
 
     :param to_email: Recipient email address.
     :param otp: 6-digit numeric OTP string.
     :param patient_name: Name of the patient.
     :return: (success: bool, message: str)
     """
-    mail_server = os.environ.get('MAIL_SERVER', '').strip()
-    mail_port = int(os.environ.get('MAIL_PORT', 587))
-    mail_user = os.environ.get('MAIL_USERNAME', '').strip()
-    mail_pass = os.environ.get('MAIL_PASSWORD', '').strip()
-    mail_tls = os.environ.get('MAIL_USE_TLS', 'True').lower() in ('true', '1', 't', 'yes')
-    mail_sender = os.environ.get('MAIL_DEFAULT_SENDER', mail_user or 'noreply@smarthealthcamp.org').strip()
+    mail_server = os.environ.get('MAIL_SERVER', 'smtp.gmail.com').strip() or 'smtp.gmail.com'
+    try:
+        mail_port = int(os.environ.get('MAIL_PORT', 587))
+    except (ValueError, TypeError):
+        mail_port = 587
 
-    # If SMTP credentials are not configured, simulate sending and provide on-screen hint
-    if not mail_server or not mail_user or not mail_pass:
-        print("\n" + "=" * 60)
-        print("[EMAIL SERVICE - DEMO MODE (SMTP NOT CONFIGURED)]")
-        print(f"-> To: {to_email} ({patient_name})")
-        print(f"-> Verification OTP Code: {otp}")
-        print("-> Time: " + datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-        print("-> Notice: To enable real live emails, set MAIL_SERVER, MAIL_USERNAME, MAIL_PASSWORD in .env")
-        print("=" * 60 + "\n")
-        return False, f"SMTP_DEMO_MODE: Your 6-digit verification code is {otp}"
+    mail_user = os.environ.get('MAIL_USERNAME', '').strip()
+    mail_pass = os.environ.get('MAIL_APP_PASSWORD', '').strip() or os.environ.get('MAIL_PASSWORD', '').strip()
+    mail_tls = os.environ.get('MAIL_USE_TLS', 'True').lower() in ('true', '1', 't', 'yes')
+    mail_sender = os.environ.get('MAIL_DEFAULT_SENDER', mail_user).strip() or mail_user
+
+    # If SMTP credentials are missing, do NOT simulate or leak OTP
+    if not mail_user or not mail_pass:
+        error_msg = "Gmail SMTP credentials missing. Please configure MAIL_USERNAME and MAIL_APP_PASSWORD in your .env file."
+        print(f"[EMAIL SERVICE ERROR] {error_msg}")
+        return False, error_msg
 
     try:
         msg = MIMEMultipart('alternative')
-        msg['Subject'] = f"Smart Health Camp - Your Verification Code: {otp}"
+        msg['Subject'] = f"Smart Health Camp - Your 6-Digit Verification Code: {otp}"
         msg['From'] = f"Smart Community Health Camp <{mail_sender}>"
         msg['To'] = to_email
 
@@ -51,9 +52,9 @@ Thank you for registering on the Smart Community Health Camp Portal.
 Your 6-digit email verification OTP code is:
 {otp}
 
-This code is valid for 15 minutes. Enter this code on the portal to activate your account and unlock your scannable Digital Health Pass.
+This code is valid for 15 minutes. Enter this code on the verification screen to activate your account and unlock your scannable Digital Health Pass.
 
-If you did not request this, please disregard this email.
+Never share this code with anyone. If you did not request this, please disregard this email.
 
 Warm regards,
 Smart Community Health Camp Team
@@ -91,14 +92,15 @@ Smart Community Health Camp Team
         msg.attach(MIMEText(text_content, 'plain'))
         msg.attach(MIMEText(html_content, 'html'))
 
-        server = smtplib.SMTP(mail_server, mail_port, timeout=10)
+        server = smtplib.SMTP(mail_server, mail_port, timeout=12)
         if mail_tls:
             server.starttls()
         server.login(mail_user, mail_pass)
         server.sendmail(mail_sender, [to_email], msg.as_string())
         server.quit()
-        return True, "Verification email sent successfully."
+        return True, "Verification email dispatched successfully."
 
     except Exception as e:
-        print(f"[ERROR] Failed to send email via SMTP: {e}")
-        return False, f"SMTP_ERROR: {str(e)} (Demo OTP: {otp})"
+        err_str = str(e)
+        print(f"[EMAIL SERVICE EXCEPTION] Failed to dispatch email to {to_email}: {err_str}")
+        return False, f"Could not connect to Gmail SMTP: {err_str}. Please verify MAIL_USERNAME and MAIL_APP_PASSWORD in .env."
