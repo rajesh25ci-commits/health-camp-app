@@ -10,6 +10,9 @@ Enterprise Full-Stack Architecture with:
 """
 
 import os
+from dotenv import load_dotenv
+load_dotenv(override=True)
+
 import json
 import uuid
 from datetime import date, datetime
