@@ -10,8 +10,11 @@ Enterprise Full-Stack Architecture with:
 """
 
 import os
-from dotenv import load_dotenv
-load_dotenv(override=True)
+try:
+    from dotenv import load_dotenv
+    load_dotenv(override=True)
+except ImportError:
+    pass
 
 import json
 import uuid

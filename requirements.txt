@@ -4,3 +4,5 @@ flask-login
 qrcode[pil]
 reportlab
 gunicorn
+python-dotenv
+requests

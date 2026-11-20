@@ -6,8 +6,11 @@ Never leaks OTPs on screen or in flash messages.
 """
 
 import os
-from dotenv import load_dotenv
-load_dotenv(override=True)
+try:
+    from dotenv import load_dotenv
+    load_dotenv(override=True)
+except ImportError:
+    pass
 
 import smtplib
 from email.mime.text import MIMEText
